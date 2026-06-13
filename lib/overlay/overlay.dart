@@ -22,7 +22,8 @@ class NetworkSimulatorOverlay {
       if (overlay == null || _entry != null) return;
 
       _entry = OverlayEntry(
-        builder: (context) => _NetworkSimulatorOverlayLayer(controller: controller),
+        builder: (context) =>
+            _NetworkSimulatorOverlayLayer(controller: controller),
       );
       overlay.insert(_entry!);
     });
@@ -40,26 +41,41 @@ class _NetworkSimulatorOverlayLayer extends StatefulWidget {
   final NetworkSimulatorController controller;
 
   @override
-  State<_NetworkSimulatorOverlayLayer> createState() => _NetworkSimulatorOverlayLayerState();
+  State<_NetworkSimulatorOverlayLayer> createState() =>
+      _NetworkSimulatorOverlayLayerState();
 }
 
-class _NetworkSimulatorOverlayLayerState extends State<_NetworkSimulatorOverlayLayer> {
-  Offset _position = const Offset(16, 24);
+class _NetworkSimulatorOverlayLayerState
+    extends State<_NetworkSimulatorOverlayLayer> {
+  final double _buttonSize = 44;
+  late double _top;
+  late double _left;
+
+  @override
+  void initState() {
+    super.initState();
+    _top = 100;
+    _left = 16;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+
     return Positioned(
-      right: _position.dx,
-      bottom: _position.dy,
+      top: _top,
+      left: _left,
       child: GestureDetector(
         onPanUpdate: (details) {
           setState(() {
-            _position += details.delta;
+            _top = (_top + details.delta.dy).clamp(0, size.height - _buttonSize);
+            _left = (_left + details.delta.dx).clamp(0, size.width - _buttonSize);
           });
         },
         child: SafeArea(
           child: NetworkSimulatorFloatingButton(
-            onPressed: () => NetworkSimulatorControlPanel.show(context, widget.controller),
+            onPressed: () =>
+                NetworkSimulatorControlPanel.show(context, widget.controller),
           ),
         ),
       ),
