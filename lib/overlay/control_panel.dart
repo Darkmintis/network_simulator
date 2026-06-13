@@ -9,16 +9,21 @@ class NetworkSimulatorControlPanel extends StatefulWidget {
 
   final NetworkSimulatorController controller;
 
+  static bool _isOpen = false;
+
   static Future<void> show(
     BuildContext context,
     NetworkSimulatorController controller,
-  ) {
-    return showModalBottomSheet<void>(
+  ) async {
+    if (_isOpen) return;
+    _isOpen = true;
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => NetworkSimulatorControlPanel(controller: controller),
     );
+    _isOpen = false;
   }
 
   @override
