@@ -1,0 +1,28 @@
+name: network_simulator
+description: A Flutter developer tool that simulates real-world network conditions by intercepting Dio requests inside your app using a floating debug control panel.
+version: 0.1.0
+homepage: https://github.com/anomalyco/network_simulator
+repository: https://github.com/anomalyco/network_simulator
+issue_tracker: https://github.com/anomalyco/network_simulator/issues
+topics:
+  - network
+  - testing
+  - debug
+  - dio
+  - devtools
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  dio: ^5.7.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
