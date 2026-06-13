@@ -13,8 +13,8 @@ class NetworkSimulatorFloatingButton extends StatelessWidget {
         customBorder: const CircleBorder(),
         onTap: onPressed,
         child: Ink(
-          width: 58,
-          height: 58,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: const LinearGradient(
@@ -25,15 +25,15 @@ class NetworkSimulatorFloatingButton extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF22D3EE).withValues(alpha: 0.35),
-                blurRadius: 18,
-                offset: const Offset(0, 10),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
           child: const Icon(
             Icons.wifi_tethering,
             color: Colors.white,
-            size: 28,
+            size: 20,
           ),
         ),
       ),

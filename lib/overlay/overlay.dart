@@ -14,15 +14,12 @@ class NetworkSimulatorOverlay {
     required NetworkSimulatorController controller,
     required GlobalKey<NavigatorState> navigatorKey,
   }) {
-    if (!kDebugMode) {
-      return;
-    }
+    if (!kDebugMode) return;
 
+    WidgetsFlutterBinding.ensureInitialized();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final overlay = navigatorKey.currentState?.overlay;
-      if (overlay == null || _entry != null) {
-        return;
-      }
+      if (overlay == null || _entry != null) return;
 
       _entry = OverlayEntry(
         builder: (context) => _NetworkSimulatorOverlayLayer(controller: controller),
@@ -37,19 +34,33 @@ class NetworkSimulatorOverlay {
   }
 }
 
-class _NetworkSimulatorOverlayLayer extends StatelessWidget {
+class _NetworkSimulatorOverlayLayer extends StatefulWidget {
   const _NetworkSimulatorOverlayLayer({required this.controller});
 
   final NetworkSimulatorController controller;
 
   @override
+  State<_NetworkSimulatorOverlayLayer> createState() => _NetworkSimulatorOverlayLayerState();
+}
+
+class _NetworkSimulatorOverlayLayerState extends State<_NetworkSimulatorOverlayLayer> {
+  Offset _position = const Offset(16, 24);
+
+  @override
   Widget build(BuildContext context) {
     return Positioned(
-      right: 16,
-      bottom: 24,
-      child: SafeArea(
-        child: NetworkSimulatorFloatingButton(
-          onPressed: () => NetworkSimulatorControlPanel.show(context, controller),
+      right: _position.dx,
+      bottom: _position.dy,
+      child: GestureDetector(
+        onPanUpdate: (details) {
+          setState(() {
+            _position += details.delta;
+          });
+        },
+        child: SafeArea(
+          child: NetworkSimulatorFloatingButton(
+            onPressed: () => NetworkSimulatorControlPanel.show(context, widget.controller),
+          ),
         ),
       ),
     );

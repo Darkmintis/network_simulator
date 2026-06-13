@@ -12,7 +12,9 @@ void main() {
       NetworkSimulatorExampleApp(dio: Dio(), navigatorKey: GlobalKey<NavigatorState>()),
     );
 
-    expect(find.text('Network Simulator Example'), findsOneWidget);
-    expect(find.text('Login request'), findsOneWidget);
+    expect(find.text('Network Simulator'), findsOneWidget);
+    expect(find.text('GET /posts'), findsOneWidget);
+    expect(find.text('GET /posts/1'), findsOneWidget);
+    expect(find.text('GET /comments'), findsOneWidget);
   });
 }
