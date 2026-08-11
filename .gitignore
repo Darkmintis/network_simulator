@@ -29,3 +29,8 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 /build/
 /coverage/
+
+# FVM — keep config tracked, ignore local SDK link/cache
+.fvm/flutter_sdk
+.fvm/versions
+.fvm/release
