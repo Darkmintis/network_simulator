@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/controller.dart';
 import '../core/mode.dart';
-import '../models/network_log.dart';
+import '../core/tunnel_status.dart';
 
 class NetworkSimulatorControlPanel extends StatefulWidget {
   const NetworkSimulatorControlPanel({super.key, required this.controller});
@@ -27,13 +27,17 @@ class NetworkSimulatorControlPanel extends StatefulWidget {
   }
 
   @override
-  State<NetworkSimulatorControlPanel> createState() => _NetworkSimulatorControlPanelState();
+  State<NetworkSimulatorControlPanel> createState() =>
+      _NetworkSimulatorControlPanelState();
 }
 
-class _NetworkSimulatorControlPanelState extends State<NetworkSimulatorControlPanel> {
+class _NetworkSimulatorControlPanelState
+    extends State<NetworkSimulatorControlPanel> {
   late NetworkMode _mode;
   late double _latencyMs;
-  late double _bandwidthMbps;
+  late double _downloadMbps;
+  late double _uploadMbps;
+  late double _jitterMs;
   late double _packetLoss;
 
   @override
@@ -45,10 +49,24 @@ class _NetworkSimulatorControlPanelState extends State<NetworkSimulatorControlPa
   void _syncFromController() {
     _mode = widget.controller.mode;
     _latencyMs = widget.controller.latencyMs;
-    _bandwidthMbps = widget.controller.bandwidthMbps.isFinite
-        ? widget.controller.bandwidthMbps
+    _downloadMbps = widget.controller.downloadMbps.isFinite
+        ? widget.controller.downloadMbps
         : 100;
+    _uploadMbps = widget.controller.uploadMbps.isFinite
+        ? widget.controller.uploadMbps
+        : 100;
+    _jitterMs = widget.controller.jitterMs;
     _packetLoss = widget.controller.packetLoss;
+  }
+
+  Future<void> _toggleTunnel() async {
+    final controller = widget.controller;
+    if (controller.status == TunnelStatus.connected ||
+        controller.status == TunnelStatus.connecting) {
+      await controller.stopTunnel();
+    } else {
+      await controller.startTunnel();
+    }
   }
 
   @override
@@ -56,7 +74,9 @@ class _NetworkSimulatorControlPanelState extends State<NetworkSimulatorControlPa
     final theme = Theme.of(context);
 
     return SafeArea(
-      child: Container(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
         margin: const EdgeInsets.all(12),
         padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
         decoration: BoxDecoration(
@@ -72,183 +92,205 @@ class _NetworkSimulatorControlPanelState extends State<NetworkSimulatorControlPa
           ],
         ),
         child: AnimatedBuilder(
-          animation: widget.controller.logger,
+          animation: widget.controller,
           builder: (context, _) {
-            final logs = widget.controller.logger.logs;
+            final status = widget.controller.status;
+            final stats = widget.controller.stats;
+            final error = widget.controller.lastError;
+
             return ConstrainedBox(
               constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.84,
+                maxHeight: MediaQuery.of(context).size.height * 0.88,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: const Color(
-                            0xFF22D3EE,
-                          ).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(14),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF22D3EE)
+                                .withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(
+                            Icons.vpn_lock,
+                            color: Color(0xFF67E8F9),
+                          ),
                         ),
-                        child: const Icon(Icons.wifi, color: Color(0xFF67E8F9)),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Network Simulator Panel',
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Network Simulator',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${_mode.label} · ${widget.controller.isOffline ? 'Offline' : 'Live simulation'}',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: Colors.white70,
+                              const SizedBox(height: 2),
+                              Text(
+                                '${status.label} · ${_mode.label}',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: Colors.white70,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.of(context).maybePop(),
-                        icon: const Icon(Icons.close, color: Colors.white70),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _ModeField(
-                    value: _mode,
-                    onChanged: (value) {
-                      setState(() {
-                        _mode = value;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  _SliderRow(
-                    label: 'Latency',
-                    valueLabel: '${_latencyMs.round()} ms',
-                    value: _latencyMs,
-                    min: 0,
-                    max: 3000,
-                    onChanged: (value) => setState(() => _latencyMs = value),
-                  ),
-                  _SliderRow(
-                    label: 'Bandwidth',
-                    valueLabel: '${_bandwidthMbps.toStringAsFixed(1)} Mbps',
-                    value: _bandwidthMbps,
-                    min: 0.1,
-                    max: 20,
-                    onChanged: (value) =>
-                        setState(() => _bandwidthMbps = value),
-                  ),
-                  _SliderRow(
-                    label: 'Packet Loss',
-                    valueLabel: '${(_packetLoss * 100).round()}%',
-                    value: _packetLoss,
-                    min: 0,
-                    max: 1,
-                    onChanged: (value) => setState(() => _packetLoss = value),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      FilledButton.tonal(
-                        onPressed: () {
-                          widget.controller.enableOffline();
-                          Navigator.of(context).maybePop();
-                        },
-                        child: const Text('Offline'),
-                      ),
-                      FilledButton.tonal(
-                        onPressed: () {
-                          widget.controller.reset();
-                          Navigator.of(context).maybePop();
-                        },
-                        child: const Text('Reset'),
-                      ),
-                      FilledButton(
-                        onPressed: () {
-                          if (_mode == NetworkMode.offline) {
-                            widget.controller.enableOffline();
-                          } else if (_mode == NetworkMode.normal) {
-                            widget.controller.reset();
-                          } else if (_mode == NetworkMode.custom) {
-                            widget.controller.setCustom(
-                              latencyMs: _latencyMs,
-                              bandwidthMbps: _bandwidthMbps,
-                              packetLoss: _packetLoss,
-                            );
-                          } else {
-                            widget.controller.setMode(_mode);
-                            widget.controller.setCustom(
-                              latencyMs: _latencyMs,
-                              bandwidthMbps: _bandwidthMbps,
-                              packetLoss: _packetLoss,
-                            );
-                          }
-                          Navigator.of(context).maybePop();
-                        },
-                        child: const Text('Apply'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Live logs',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
+                        IconButton(
+                          onPressed: () => Navigator.of(context).maybePop(),
+                          icon: const Icon(Icons.close, color: Colors.white70),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: _toggleTunnel,
+                      icon: Icon(
+                        status == TunnelStatus.connected
+                            ? Icons.stop_circle_outlined
+                            : Icons.play_circle_outline,
                       ),
-                      TextButton(
-                        onPressed: widget.controller.logger.clear,
-                        child: const Text('Clear logs'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  if (logs.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      child: Text(
-                        'No requests yet. Trigger an API call to see Network Simulator activity here.',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: Colors.white70,
-                        ),
-                      ),
-                    )
-                  else
-                    Flexible(
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        itemCount: logs.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final log = logs[index];
-                          return _LogTile(log: log);
-                        },
+                      label: Text(
+                        status == TunnelStatus.connected ||
+                                status == TunnelStatus.connecting
+                            ? 'Stop tunnel'
+                            : 'Start tunnel',
                       ),
                     ),
-                ],
+                    if (error != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        error,
+                        style: const TextStyle(color: Color(0xFFF87171)),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Text(
+                      stats.summary,
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    const SizedBox(height: 18),
+                    _ModeField(
+                      value: _mode,
+                      onChanged: (value) => setState(() => _mode = value),
+                    ),
+                    const SizedBox(height: 16),
+                    _SliderRow(
+                      label: 'Latency',
+                      valueLabel: '${_latencyMs.round()} ms',
+                      value: _latencyMs,
+                      min: 0,
+                      max: 3000,
+                      onChanged: (value) =>
+                          setState(() => _latencyMs = value),
+                    ),
+                    _SliderRow(
+                      label: 'Download',
+                      valueLabel: '${_downloadMbps.toStringAsFixed(1)} Mbps',
+                      value: _downloadMbps,
+                      min: 0.05,
+                      max: 50,
+                      onChanged: (value) =>
+                          setState(() => _downloadMbps = value),
+                    ),
+                    _SliderRow(
+                      label: 'Upload',
+                      valueLabel: '${_uploadMbps.toStringAsFixed(1)} Mbps',
+                      value: _uploadMbps,
+                      min: 0.05,
+                      max: 50,
+                      onChanged: (value) =>
+                          setState(() => _uploadMbps = value),
+                    ),
+                    _SliderRow(
+                      label: 'Jitter',
+                      valueLabel: '${_jitterMs.round()} ms',
+                      value: _jitterMs,
+                      min: 0,
+                      max: 500,
+                      onChanged: (value) => setState(() => _jitterMs = value),
+                    ),
+                    _SliderRow(
+                      label: 'Packet Loss',
+                      valueLabel: '${(_packetLoss * 100).round()}%',
+                      value: _packetLoss,
+                      min: 0,
+                      max: 1,
+                      onChanged: (value) =>
+                          setState(() => _packetLoss = value),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        FilledButton.tonal(
+                          onPressed: () {
+                            widget.controller.enableOffline();
+                            _syncFromController();
+                            setState(() {});
+                          },
+                          child: const Text('Offline'),
+                        ),
+                        FilledButton.tonal(
+                          onPressed: () {
+                            widget.controller.reset();
+                            _syncFromController();
+                            setState(() {});
+                          },
+                          child: const Text('Reset'),
+                        ),
+                        FilledButton(
+                          onPressed: () {
+                            if (_mode == NetworkMode.offline) {
+                              widget.controller.enableOffline();
+                            } else if (_mode == NetworkMode.normal) {
+                              widget.controller.reset();
+                            } else if (_mode == NetworkMode.custom) {
+                              widget.controller.setCustom(
+                                latencyMs: _latencyMs,
+                                downloadMbps: _downloadMbps,
+                                uploadMbps: _uploadMbps,
+                                jitterMs: _jitterMs,
+                                packetLoss: _packetLoss,
+                              );
+                            } else {
+                              widget.controller.setMode(_mode);
+                              widget.controller.setCustom(
+                                latencyMs: _latencyMs,
+                                downloadMbps: _downloadMbps,
+                                uploadMbps: _uploadMbps,
+                                jitterMs: _jitterMs,
+                                packetLoss: _packetLoss,
+                              );
+                            }
+                            _syncFromController();
+                            setState(() {});
+                          },
+                          child: const Text('Apply'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Tunnel shapes all app traffic at the OS level. '
+                      'Android is supported; iOS is experimental.',
+                      style: TextStyle(color: Colors.white54, fontSize: 12),
+                    ),
+                  ],
+                ),
               ),
             );
           },
         ),
+      ),
       ),
     );
   }
@@ -263,7 +305,7 @@ class _ModeField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<NetworkMode>(
-      value: value,
+      initialValue: value,
       dropdownColor: const Color(0xFF0F172A),
       decoration: InputDecoration(
         labelText: 'Mode',
@@ -279,14 +321,12 @@ class _ModeField extends StatelessWidget {
           .map(
             (mode) => DropdownMenuItem<NetworkMode>(
               value: mode,
-              child: Text(mode.label),
+              child: Text(mode.label, style: const TextStyle(color: Colors.white)),
             ),
           )
           .toList(),
       onChanged: (value) {
-        if (value != null) {
-          onChanged(value);
-        }
+        if (value != null) onChanged(value);
       },
     );
   }
@@ -328,64 +368,6 @@ class _SliderRow extends StatelessWidget {
             min: min,
             max: max,
             onChanged: onChanged,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LogTile extends StatelessWidget {
-  const _LogTile({required this.log});
-
-  final NetworkLog log;
-
-  @override
-  Widget build(BuildContext context) {
-    final successColor = log.success
-        ? const Color(0xFF34D399)
-        : const Color(0xFFF87171);
-    final icon = log.success ? Icons.check_circle : Icons.error_outline;
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: successColor, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${log.method} ${log.url}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${log.durationMs} ms${log.statusCode == null ? '' : ' · ${log.statusCode}'}',
-                  style: const TextStyle(color: Colors.white70),
-                ),
-                if (log.errorMessage != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    log.errorMessage ?? '',
-                    style: const TextStyle(color: Colors.white54),
-                  ),
-                ],
-              ],
-            ),
           ),
         ],
       ),
