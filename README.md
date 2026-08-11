@@ -1,9 +1,10 @@
 # Network Simulator
 
-[![pub.dev](https://img.shields.io/pub/v/network_simulator.svg)](https://pub.dev/packages/network_simulator)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A Flutter developer tool that simulates real-world network conditions by intercepting Dio requests inside your app.
+A Flutter **debug** plugin that simulates real-world network conditions through a **local VPN tunnel** — not fake HTTP delays.
+
+**Repository:** [github.com/Darkmintis/network_simulator](https://github.com/Darkmintis/network_simulator)
 
 ```bash
 flutter pub add network_simulator
@@ -11,54 +12,92 @@ flutter pub add network_simulator
 
 ## Features
 
-- **Dio interceptor** — hooks into every request/response/error automatically
-- **Latency & bandwidth** — simulate slow connections with configurable delay
-- **Packet loss** — randomly fail requests at a set probability
-- **Offline mode** — instantly block all requests
-- **Predefined profiles** — `normal`, `slow2G`, `slow3G`, `fast3G`, `unstable4G`, `offline`
-- **Floating debug overlay** — WiFi button opens a live control panel
-- **Request logger** — view method, URL, timing and status in-app
+- **Real traffic shaping** via Android `VpnService` / iOS `NEPacketTunnelProvider`
+- Latency, jitter, download/upload bandwidth, packet loss, offline
+- Presets: `normal`, `slow2G`, `slow3G`, `fast3G`, `unstable4G`, `offline`
+- Floating debug overlay with live tunnel stats
+- App-scoped on Android (only your Flutter app is shaped)
+- Zero effect in release builds by default (`kDebugMode`)
+
+| Platform | Status |
+|----------|--------|
+| Android | Supported |
+| iOS | Experimental / needs device testing — see [docs/ios-wip.md](docs/ios-wip.md) |
 
 ## Usage
 
 ```dart
 import 'package:network_simulator/network_simulator.dart';
 
-final dio = Dio();
 final navigatorKey = GlobalKey<NavigatorState>();
 
-NetworkSimulator.init(
-  dio: dio,
+await NetworkSimulator.init(
   enableOverlay: true,
   navigatorKey: navigatorKey,
+  // iOS only — Packet Tunnel extension bundle id
+  providerBundleIdentifier: 'com.example.app.NetworkSimulatorTunnel',
 );
 
-// Switch profiles at runtime
+// Explicit opt-in — never auto-starts
+await NetworkSimulator.startTunnel();
+
 NetworkSimulator.setMode(NetworkMode.slow3G);
-NetworkSimulator.custom(latencyMs: 500, bandwidthMbps: 1, packetLoss: 0.1);
+NetworkSimulator.custom(
+  latencyMs: 500,
+  downloadMbps: 1,
+  uploadMbps: 0.5,
+  jitterMs: 40,
+  packetLoss: 0.1,
+);
 NetworkSimulator.offline();
+await NetworkSimulator.stopTunnel();
 NetworkSimulator.reset();
 ```
 
-The interceptor is automatically wired — every request through your `Dio` instance gets simulated. Works only in debug mode and has zero impact on release builds.
+On Android the system VPN permission dialog appears once. While the tunnel is running you will see a foreground notification and a VPN indicator.
 
 ## Profiles
 
-| Profile | Latency | Bandwidth | Packet loss |
-|---|---|---|---|
-| normal | 0 ms | unlimited | 0% |
-| slow2G | 2000 ms | 0.1 Mbps | 20% |
-| slow3G | 800 ms | 0.5 Mbps | 10% |
-| fast3G | 300 ms | 1.5 Mbps | 3% |
-| unstable4G | 120 ms | 4.0 Mbps | 15% |
-| offline | — | — | 100% |
+| Profile | Latency | Download | Upload | Loss | Jitter |
+|---------|---------|----------|--------|------|--------|
+| normal | 0 | unlimited | unlimited | 0% | 0 |
+| slow2G | 2000 ms | 0.1 Mbps | 0.05 Mbps | 20% | 300 ms |
+| slow3G | 800 ms | 0.5 Mbps | 0.25 Mbps | 10% | 150 ms |
+| fast3G | 300 ms | 1.5 Mbps | 0.75 Mbps | 3% | 50 ms |
+| unstable4G | 120 ms | 4 Mbps | 2 Mbps | 15% | 80 ms |
+| offline | — | 0 | 0 | 100% | — |
 
 ## Requirements
 
-- Dart `>=3.0.0 <4.0.0`
-- Flutter `>=3.10.0`
-- Dio `^5.7.0`
+- Flutter `3.44.1` (pinned via [FVM](https://fvm.app) — run `fvm use`)
+- Dart `^3.12.0`
+- Android: `compileSdk` / `targetSdk` **36**, `minSdk` 24+, Gradle **8.14**, AGP **8.13.0**
+- iOS 13+ with Network Extension entitlements ([docs/ios-setup.md](docs/ios-setup.md))
+
+```bash
+fvm install 3.44.1
+fvm use 3.44.1
+fvm flutter pub get
+cd example && fvm flutter run -d android
+```
+
+## Architecture
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Example
 
-See the [`example/`](example/) directory for a complete app with login and user-fetching requests.
+```bash
+cd example
+flutter run -d android
+```
+
+Use the overlay to start the tunnel, pick Slow 3G, then hit any HTTP endpoint in the demo.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). iOS forwarder help is especially welcome.
+
+## License
+
+MIT
