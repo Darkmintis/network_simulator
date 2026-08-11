@@ -1,35 +1,24 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-
+import 'package:http/http.dart' as http;
 import 'package:network_simulator/network_simulator.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   final navigatorKey = GlobalKey<NavigatorState>();
-  final dio = Dio(
-    BaseOptions(
-      baseUrl: 'https://jsonplaceholder.typicode.com',
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-    ),
-  );
 
-  NetworkSimulator.init(
-    dio: dio,
+  await NetworkSimulator.init(
     enableOverlay: true,
     navigatorKey: navigatorKey,
+    providerBundleIdentifier:
+        'com.example.networkSimulator.NetworkSimulatorTunnel',
   );
 
-  runApp(NetworkSimulatorExampleApp(dio: dio, navigatorKey: navigatorKey));
+  runApp(NetworkSimulatorExampleApp(navigatorKey: navigatorKey));
 }
 
 class NetworkSimulatorExampleApp extends StatelessWidget {
-  const NetworkSimulatorExampleApp({
-    super.key,
-    required this.dio,
-    required this.navigatorKey,
-  });
+  const NetworkSimulatorExampleApp({super.key, required this.navigatorKey});
 
-  final Dio dio;
   final GlobalKey<NavigatorState> navigatorKey;
 
   @override
@@ -43,50 +32,32 @@ class NetworkSimulatorExampleApp extends StatelessWidget {
         brightness: Brightness.dark,
         useMaterial3: true,
       ),
-      home: DemoHomePage(dio: dio),
+      home: const DemoHomePage(),
     );
   }
 }
 
 class DemoHomePage extends StatefulWidget {
-  const DemoHomePage({super.key, required this.dio});
-
-  final Dio dio;
+  const DemoHomePage({super.key});
 
   @override
   State<DemoHomePage> createState() => _DemoHomePageState();
 }
 
 class _DemoHomePageState extends State<DemoHomePage> {
-  String _result = 'Tap a button to make a request';
+  String _result = 'Start the tunnel from the overlay, then fetch.';
 
-  Future<void> _getPosts() async {
-    setState(() => _result = 'Loading posts...');
+  Future<void> _get(String path) async {
+    setState(() => _result = 'Loading $path ...');
     try {
-      final response = await widget.dio.get('/posts');
-      setState(() => _result = 'Fetched ${response.data.length} posts');
-    } on DioException catch (e) {
-      setState(() => _result = 'Error: ${e.message}');
-    }
-  }
-
-  Future<void> _getPost(int id) async {
-    setState(() => _result = 'Loading post $id...');
-    try {
-      final response = await widget.dio.get('/posts/$id');
-      setState(() => _result = 'Post $id: ${response.data['title']}');
-    } on DioException catch (e) {
-      setState(() => _result = 'Error: ${e.message}');
-    }
-  }
-
-  Future<void> _getComments() async {
-    setState(() => _result = 'Loading comments...');
-    try {
-      final response = await widget.dio.get('/comments');
-      setState(() => _result = 'Fetched ${response.data.length} comments');
-    } on DioException catch (e) {
-      setState(() => _result = 'Error: ${e.message}');
+      final response = await http.get(
+        Uri.parse('https://jsonplaceholder.typicode.com$path'),
+      );
+      setState(
+        () => _result = 'HTTP ${response.statusCode} · ${response.body.length} bytes',
+      );
+    } catch (error) {
+      setState(() => _result = 'Error: $error');
     }
   }
 
@@ -105,8 +76,8 @@ class _DemoHomePageState extends State<DemoHomePage> {
             child: const Text('Offline'),
           ),
           TextButton(
-            onPressed: () => NetworkSimulator.reset(),
-            child: const Text('Reset'),
+            onPressed: () async => NetworkSimulator.stopTunnel(),
+            child: const Text('Stop'),
           ),
         ],
       ),
@@ -115,6 +86,16 @@ class _DemoHomePageState extends State<DemoHomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            AnimatedBuilder(
+              animation: NetworkSimulator.controller,
+              builder: (context, _) {
+                final c = NetworkSimulator.controller;
+                return Text(
+                  'Tunnel: ${c.status.label}\n${c.stats.summary}',
+                  textAlign: TextAlign.center,
+                );
+              },
+            ),
             Expanded(
               child: Center(
                 child: Text(
@@ -124,26 +105,30 @@ class _DemoHomePageState extends State<DemoHomePage> {
                 ),
               ),
             ),
+            FilledButton(
+              onPressed: () => NetworkSimulator.startTunnel(),
+              child: const Text('Start tunnel'),
+            ),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 12,
               runSpacing: 12,
               alignment: WrapAlignment.center,
               children: [
                 FilledButton(
-                  onPressed: _getPosts,
+                  onPressed: () => _get('/posts'),
                   child: const Text('GET /posts'),
                 ),
                 FilledButton(
-                  onPressed: () => _getPost(1),
+                  onPressed: () => _get('/posts/1'),
                   child: const Text('GET /posts/1'),
                 ),
                 FilledButton(
-                  onPressed: _getComments,
+                  onPressed: () => _get('/comments'),
                   child: const Text('GET /comments'),
                 ),
               ],
             ),
-            const SizedBox(height: 32),
           ],
         ),
       ),

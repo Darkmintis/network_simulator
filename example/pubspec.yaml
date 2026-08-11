@@ -1,6 +1,6 @@
 name: network_simulator_example
 description: "Example app for the network_simulator package."
-publish_to: 'none'
+publish_to: "none"
 
 version: 1.0.0+1
 
@@ -10,16 +10,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  dio: ^5.7.0
+  http: ^1.2.2
   network_simulator:
     path: ..
-
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
   flutter_lints: ^6.0.0
 
 flutter:
