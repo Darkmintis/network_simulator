@@ -1,4 +1,13 @@
-enum NetworkMode { normal, slow2G, slow3G, fast3G, unstable4G, offline, custom }
+/// Preset network condition profiles applied by the native traffic shaper.
+enum NetworkMode {
+  normal,
+  slow2G,
+  slow3G,
+  fast3G,
+  unstable4G,
+  offline,
+  custom,
+}
 
 extension NetworkModeProfile on NetworkMode {
   String get label {
