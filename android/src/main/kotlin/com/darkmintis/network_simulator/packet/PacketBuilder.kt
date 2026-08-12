@@ -50,8 +50,10 @@ object PacketBuilder {
         flags: Int,
         window: Int,
         payload: ByteArray,
-        optionsLength: Int = 0,
+        mss: Int? = null,
     ): ByteArray {
+        val options = buildTcpOptions(mss)
+        val optionsLength = options.size
         val dataOffset = 20 + optionsLength
         val tcpLength = dataOffset + payload.size
         val totalLength = 20 + tcpLength
@@ -78,6 +80,9 @@ object PacketBuilder {
         packet[tcpOffset + 13] = (flags and 0x3F).toByte()
         packet[tcpOffset + 14] = ((window ushr 8) and 0xFF).toByte()
         packet[tcpOffset + 15] = (window and 0xFF).toByte()
+        if (optionsLength > 0) {
+            System.arraycopy(options, 0, packet, tcpOffset + 20, optionsLength)
+        }
         if (payload.isNotEmpty()) {
             System.arraycopy(payload, 0, packet, tcpOffset + dataOffset, payload.size)
         }
@@ -144,5 +149,15 @@ object PacketBuilder {
         }
         val result = (sum.inv() and 0xFFFF).toInt()
         return if (result == 0 && protocol == Ipv4Packet.PROTOCOL_UDP) 0xFFFF else result
+    }
+
+    private fun buildTcpOptions(mss: Int?): ByteArray {
+        if (mss == null) return ByteArray(0)
+        return byteArrayOf(
+            0x02,
+            0x04,
+            ((mss shr 8) and 0xFF).toByte(),
+            (mss and 0xFF).toByte(),
+        )
     }
 }

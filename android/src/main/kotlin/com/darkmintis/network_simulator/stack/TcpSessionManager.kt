@@ -10,6 +10,7 @@ import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.random.Random
@@ -32,6 +33,12 @@ class TcpSessionManager(
         val remotePort: Int,
     )
 
+    private data class HandshakeState(
+        val serverSeq: Long,
+        var clientNextSeq: Long,
+        val pendingSegments: ConcurrentLinkedQueue<TcpSegment> = ConcurrentLinkedQueue(),
+    )
+
     private class Session(
         val key: Key,
         val socket: Socket,
@@ -41,6 +48,7 @@ class TcpSessionManager(
     )
 
     private val sessions = ConcurrentHashMap<Key, Session>()
+    private val handshakes = ConcurrentHashMap<Key, HandshakeState>()
 
     fun handlePacket(packet: Ipv4Packet) {
         val segment = TcpSegment.parse(packet) ?: return
@@ -52,22 +60,43 @@ class TcpSessionManager(
         )
 
         if (segment.isRst) {
+            handshakes.remove(key)
             sessions.remove(key)?.let { closeSession(it) }
             return
         }
 
         if (segment.isSyn && !segment.isAck) {
-            openSession(key, segment, packet.totalLength)
+            handleSyn(key, segment, packet.totalLength)
             return
         }
 
-        val session = sessions[key] ?: return
-        if (!shaper.admit(TrafficDirection.UPLOAD, packet.totalLength)) {
+        val session = sessions[key]
+        if (session == null) {
+            handshakes[key]?.let { state ->
+                if (segment.isAck && !segment.isSyn) {
+                    state.clientNextSeq = maxSeq(
+                        state.clientNextSeq,
+                        (segment.sequenceNumber + segment.payload.size) and 0xFFFFFFFFL,
+                    )
+                }
+                if (segment.payload.isNotEmpty() || segment.isFin) {
+                    state.pendingSegments.add(segment)
+                }
+            }
+            return
+        }
+
+        handleSessionPacket(session, segment, packet.totalLength)
+    }
+
+    private fun handleSessionPacket(session: Session, segment: TcpSegment, packetSize: Int) {
+        val key = session.key
+        if (!shaper.admit(TrafficDirection.UPLOAD, packetSize)) {
             stats.onDrop()
             return
         }
-        shaper.shape(TrafficDirection.UPLOAD, packet.totalLength)
-        stats.onUpload(packet.totalLength)
+        shaper.shape(TrafficDirection.UPLOAD, packetSize)
+        stats.onUpload(packetSize)
 
         if (segment.payload.isNotEmpty()) {
             try {
@@ -90,60 +119,116 @@ class TcpSessionManager(
         }
     }
 
-    private fun openSession(key: Key, segment: TcpSegment, packetSize: Int) {
+    private fun flushPending(session: Session, state: HandshakeState) {
+        session.clientNextSeq = state.clientNextSeq
+        while (true) {
+            val segment = state.pendingSegments.poll() ?: break
+            handleSessionPacket(session, segment, segment.payload.size + 40)
+        }
+    }
+
+    private fun maxSeq(current: Long, next: Long): Long {
+        val delta = (next - current) and 0xFFFFFFFFL
+        return if (delta < 0x80000000L) next else current
+    }
+
+    private fun handleSyn(key: Key, segment: TcpSegment, packetSize: Int) {
+        handshakes[key]?.let { state ->
+            // SYN retransmit — reply with the same SYN-ACK.
+            shapeUpload(packetSize)
+            writeSynAck(key, state)
+            return
+        }
+        if (sessions.containsKey(key)) return
+
         if (!shaper.admit(TrafficDirection.UPLOAD, packetSize)) {
             stats.onDrop()
             return
         }
-        shaper.shape(TrafficDirection.UPLOAD, packetSize)
-        stats.onUpload(packetSize)
+        shapeUpload(packetSize)
+
+        val serverSeq = Random.nextLong(1, 0x7FFFFFFF)
+        val clientNextSeq = (segment.sequenceNumber + 1) and 0xFFFFFFFFL
+        val state = HandshakeState(serverSeq = serverSeq, clientNextSeq = clientNextSeq)
+        handshakes[key] = state
+
+        // Reply immediately so the client does not flood SYN retransmits.
+        writeSynAck(key, state)
 
         executor.execute {
             try {
                 val socket = Socket()
-                protector.protect(socket)
+                if (!protector.protect(socket)) {
+                    throw IllegalStateException("Failed to protect TCP socket from VPN loop")
+                }
                 socket.tcpNoDelay = true
                 socket.connect(
                     InetSocketAddress(
                         Ipv4Packet.addressToString(key.remoteIp),
                         key.remotePort,
                     ),
-                    10_000,
+                    15_000,
                 )
 
-                val serverSeq = Random.nextLong(0, Int.MAX_VALUE.toLong())
                 val session = Session(
                     key = key,
                     socket = socket,
-                    clientNextSeq = (segment.sequenceNumber + 1) and 0xFFFFFFFFL,
-                    serverSeq = serverSeq,
+                    clientNextSeq = clientNextSeq,
+                    serverSeq = (serverSeq + 1) and 0xFFFFFFFFL,
                 )
+                val handshakeState = handshakes[key]
                 sessions[key] = session
-
-                val synAck = PacketBuilder.buildTcp(
-                    sourceIp = key.remoteIp,
-                    destIp = key.clientIp,
-                    sourcePort = key.remotePort,
-                    destPort = key.clientPort,
-                    seq = serverSeq,
-                    ack = session.clientNextSeq,
-                    flags = TcpSegment.FLAG_SYN or TcpSegment.FLAG_ACK,
-                    window = 65535,
-                    payload = ByteArray(0),
-                )
-                shapeAndWriteDownload(synAck)
-                session.serverSeq = (serverSeq + 1) and 0xFFFFFFFFL
-
+                handshakes.remove(key)
+                if (handshakeState != null) {
+                    flushPending(session, handshakeState)
+                }
                 pumpRemoteToTun(session)
             } catch (_: Exception) {
-                // Connection failed; client will retry.
+                handshakes.remove(key)
+                writeRst(key, state)
             }
         }
     }
 
+    private fun writeSynAck(key: Key, state: HandshakeState) {
+        val packet = PacketBuilder.buildTcp(
+            sourceIp = key.remoteIp,
+            destIp = key.clientIp,
+            sourcePort = key.remotePort,
+            destPort = key.clientPort,
+            seq = state.serverSeq,
+            ack = state.clientNextSeq,
+            flags = TcpSegment.FLAG_SYN or TcpSegment.FLAG_ACK,
+            window = 65535,
+            payload = ByteArray(0),
+            mss = DEFAULT_MSS,
+        )
+        shapeAndWriteDownload(packet)
+    }
+
+    private fun writeRst(key: Key, state: HandshakeState) {
+        val packet = PacketBuilder.buildTcp(
+            sourceIp = key.remoteIp,
+            destIp = key.clientIp,
+            sourcePort = key.remotePort,
+            destPort = key.clientPort,
+            seq = (state.serverSeq + 1) and 0xFFFFFFFFL,
+            ack = state.clientNextSeq,
+            flags = TcpSegment.FLAG_RST or TcpSegment.FLAG_ACK,
+            window = 0,
+            payload = ByteArray(0),
+        )
+        shapeAndWriteDownload(packet)
+    }
+
+    private fun shapeUpload(packetSize: Int) {
+        shaper.shape(TrafficDirection.UPLOAD, packetSize)
+        stats.onUpload(packetSize)
+    }
+
     private fun pumpRemoteToTun(session: Session) {
         executor.execute {
-            val buffer = ByteArray(32 * 1024)
+            val buffer = ByteArray(16 * 1024)
             try {
                 val input: InputStream = session.socket.getInputStream()
                 while (!session.closed.get()) {
@@ -219,7 +304,12 @@ class TcpSessionManager(
     }
 
     fun closeAll() {
+        handshakes.clear()
         sessions.values.forEach { closeSession(it) }
         sessions.clear()
+    }
+
+    companion object {
+        private const val DEFAULT_MSS = 1400
     }
 }

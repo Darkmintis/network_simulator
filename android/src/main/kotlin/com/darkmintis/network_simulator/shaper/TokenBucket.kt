@@ -24,8 +24,11 @@ class TokenBucket(
 
     @Synchronized
     fun tryConsume(bytes: Int): Boolean {
-        if (!rateBytesPerSecond.isFinite() || rateBytesPerSecond <= 0) {
-            return rateBytesPerSecond > 0 || rateBytesPerSecond.isInfinite()
+        if (!rateBytesPerSecond.isFinite()) {
+            return true
+        }
+        if (rateBytesPerSecond <= 0) {
+            return false
         }
         refill()
         if (tokens >= bytes) {
@@ -38,7 +41,7 @@ class TokenBucket(
     @Synchronized
     fun waitTimeMillis(bytes: Int): Long {
         if (!rateBytesPerSecond.isFinite() || rateBytesPerSecond <= 0) {
-            return 0L
+            return 50L
         }
         refill()
         if (tokens >= bytes) return 0L

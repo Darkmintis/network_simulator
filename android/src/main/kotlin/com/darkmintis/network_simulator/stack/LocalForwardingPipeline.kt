@@ -31,7 +31,7 @@ class LocalForwardingPipeline(
         stop()
         this.tunInterface = tunInterface
         stats.reset()
-        val executor = Executors.newCachedThreadPool()
+        val executor = Executors.newFixedThreadPool(8)
         this.executor = executor
 
         val output = FileOutputStream(tunInterface.fileDescriptor)
@@ -54,7 +54,10 @@ class LocalForwardingPipeline(
                 } catch (_: Exception) {
                     break
                 }
-                if (length <= 0) continue
+                if (length <= 0) {
+                    Thread.sleep(1)
+                    continue
+                }
                 val raw = buffer.copyOf(length)
                 val packet = Ipv4Packet.parse(raw) ?: continue
                 when (packet.protocol) {

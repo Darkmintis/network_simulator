@@ -63,7 +63,7 @@ class NetworkSimulatorVpnService : VpnService() {
             val builder = Builder()
                 .setSession("Network Simulator")
                 .setMtu(1500)
-                .addAddress(VPN_ADDRESS, 32)
+                .addAddress(VPN_ADDRESS, 24)
                 .addRoute("0.0.0.0", 0)
                 .addDnsServer("8.8.8.8")
                 .addDnsServer("1.1.1.1")

@@ -46,7 +46,12 @@ class UdpSessionManager(
         shaper.shape(TrafficDirection.UPLOAD, packet.totalLength)
         stats.onUpload(packet.totalLength)
 
-        val socket = sessions.getOrPut(key) { createSocket(key) }
+        val socket = try {
+            sessions.getOrPut(key) { createSocket(key) }
+        } catch (_: Exception) {
+            stats.onDrop()
+            return
+        }
 
         val address = InetAddress.getByName(Ipv4Packet.addressToString(packet.destinationAddress))
         val datagram = DatagramPacket(
@@ -60,7 +65,9 @@ class UdpSessionManager(
 
     private fun createSocket(key: Key): DatagramSocket {
         val socket = DatagramSocket()
-        protector.protect(socket)
+        if (!protector.protect(socket)) {
+            throw IllegalStateException("Failed to protect UDP socket from VPN loop")
+        }
         executor.execute {
             val buffer = ByteArray(65535)
             try {
