@@ -20,10 +20,9 @@ iOS requires a **Network Extension** target in the **host app**. Flutter plugins
 
 ```dart
 await NetworkSimulator.init(
-  enableOverlay: true,
-  navigatorKey: navigatorKey,
   providerBundleIdentifier: 'com.example.networkSimulator.NetworkSimulatorTunnel',
 );
+await NetworkSimulator.open(context);
 await NetworkSimulator.startTunnel();
 ```
 

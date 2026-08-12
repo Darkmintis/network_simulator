@@ -4,60 +4,88 @@ import 'package:network_simulator/network_simulator.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final navigatorKey = GlobalKey<NavigatorState>();
-
   await NetworkSimulator.init(
-    enableOverlay: true,
-    navigatorKey: navigatorKey,
     providerBundleIdentifier:
         'com.example.networkSimulator.NetworkSimulatorTunnel',
   );
-
-  runApp(NetworkSimulatorExampleApp(navigatorKey: navigatorKey));
+  runApp(const ExampleApp());
 }
 
-class NetworkSimulatorExampleApp extends StatelessWidget {
-  const NetworkSimulatorExampleApp({super.key, required this.navigatorKey});
-
-  final GlobalKey<NavigatorState> navigatorKey;
+/// Minimal demo app — only shows HTTP requests against a live API.
+///
+/// The network simulator is opened separately via the app-bar icon.
+class ExampleApp extends StatelessWidget {
+  const ExampleApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      navigatorKey: navigatorKey,
-      title: 'Network Simulator',
+      title: 'Example',
       theme: ThemeData(
-        colorSchemeSeed: const Color(0xFF22D3EE),
-        brightness: Brightness.dark,
+        colorSchemeSeed: Colors.indigo,
         useMaterial3: true,
       ),
-      home: const DemoHomePage(),
+      home: const ApiDemoPage(),
     );
   }
 }
 
-class DemoHomePage extends StatefulWidget {
-  const DemoHomePage({super.key});
+class _RequestResult {
+  _RequestResult({
+    required this.label,
+    required this.durationMs,
+    this.statusCode,
+    this.error,
+    this.bytes,
+  });
 
-  @override
-  State<DemoHomePage> createState() => _DemoHomePageState();
+  final String label;
+  final int durationMs;
+  final int? statusCode;
+  final String? error;
+  final int? bytes;
 }
 
-class _DemoHomePageState extends State<DemoHomePage> {
-  String _result = 'Start the tunnel from the overlay, then fetch.';
+class ApiDemoPage extends StatefulWidget {
+  const ApiDemoPage({super.key});
 
-  Future<void> _get(String path) async {
-    setState(() => _result = 'Loading $path ...');
+  @override
+  State<ApiDemoPage> createState() => _ApiDemoPageState();
+}
+
+class _ApiDemoPageState extends State<ApiDemoPage> {
+  _RequestResult? _lastResult;
+  bool _loading = false;
+
+  Future<void> _request(String label, Future<http.Response> Function() call) async {
+    setState(() {
+      _loading = true;
+      _lastResult = null;
+    });
+
+    final stopwatch = Stopwatch()..start();
     try {
-      final response = await http.get(
-        Uri.parse('https://jsonplaceholder.typicode.com$path'),
-      );
-      setState(
-        () => _result = 'HTTP ${response.statusCode} · ${response.body.length} bytes',
-      );
+      final response = await call();
+      stopwatch.stop();
+      setState(() {
+        _lastResult = _RequestResult(
+          label: label,
+          durationMs: stopwatch.elapsedMilliseconds,
+          statusCode: response.statusCode,
+          bytes: response.body.length,
+        );
+      });
     } catch (error) {
-      setState(() => _result = 'Error: $error');
+      stopwatch.stop();
+      setState(() {
+        _lastResult = _RequestResult(
+          label: label,
+          durationMs: stopwatch.elapsedMilliseconds,
+          error: error.toString(),
+        );
+      });
+    } finally {
+      setState(() => _loading = false);
     }
   }
 
@@ -65,70 +93,70 @@ class _DemoHomePageState extends State<DemoHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Network Simulator'),
-        actions: [
-          TextButton(
-            onPressed: () => NetworkSimulator.setMode(NetworkMode.slow3G),
-            child: const Text('Slow 3G'),
-          ),
-          TextButton(
-            onPressed: () => NetworkSimulator.offline(),
-            child: const Text('Offline'),
-          ),
-          TextButton(
-            onPressed: () async => NetworkSimulator.stopTunnel(),
-            child: const Text('Stop'),
-          ),
-        ],
+        title: const Text('Example'),
+        actions: const [NetworkSimulatorLauncherIcon()],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            AnimatedBuilder(
-              animation: NetworkSimulator.controller,
-              builder: (context, _) {
-                final c = NetworkSimulator.controller;
-                return Text(
-                  'Tunnel: ${c.status.label}\n${c.stats.summary}',
-                  textAlign: TextAlign.center,
-                );
-              },
-            ),
-            Expanded(
-              child: Center(
-                child: Text(
-                  _result,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-            ),
             FilledButton(
-              onPressed: () => NetworkSimulator.startTunnel(),
-              child: const Text('Start tunnel'),
+              onPressed: _loading
+                  ? null
+                  : () => _request(
+                      'GET /posts',
+                      () => http.get(
+                        Uri.parse('https://jsonplaceholder.typicode.com/posts'),
+                      ),
+                    ),
+              child: const Text('GET /posts'),
             ),
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              alignment: WrapAlignment.center,
-              children: [
-                FilledButton(
-                  onPressed: () => _get('/posts'),
-                  child: const Text('GET /posts'),
-                ),
-                FilledButton(
-                  onPressed: () => _get('/posts/1'),
-                  child: const Text('GET /posts/1'),
-                ),
-                FilledButton(
-                  onPressed: () => _get('/comments'),
-                  child: const Text('GET /comments'),
-                ),
-              ],
+            FilledButton(
+              onPressed: _loading
+                  ? null
+                  : () => _request(
+                      'GET /posts/1',
+                      () => http.get(
+                        Uri.parse(
+                          'https://jsonplaceholder.typicode.com/posts/1',
+                        ),
+                      ),
+                    ),
+              child: const Text('GET /posts/1'),
             ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: _loading
+                  ? null
+                  : () => _request(
+                      'POST /posts',
+                      () => http.post(
+                        Uri.parse('https://jsonplaceholder.typicode.com/posts'),
+                        headers: {'Content-Type': 'application/json'},
+                        body: '{"title":"test","body":"hello","userId":1}',
+                      ),
+                    ),
+              child: const Text('POST /posts'),
+            ),
+            const SizedBox(height: 24),
+            if (_loading) const Center(child: CircularProgressIndicator()),
+            if (_lastResult != null && !_loading) ...[
+              Text(
+                _lastResult!.label,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _lastResult!.error != null
+                    ? '${_lastResult!.durationMs} ms · Error: ${_lastResult!.error}'
+                    : '${_lastResult!.durationMs} ms · HTTP ${_lastResult!.statusCode} · ${_lastResult!.bytes} bytes',
+                style: TextStyle(
+                  color: _lastResult!.error != null ? Colors.red : null,
+                ),
+              ),
+            ],
           ],
         ),
       ),

@@ -17,7 +17,7 @@ flutter pub add network_simulator
 - **Real traffic shaping** via Android `VpnService` / iOS `NEPacketTunnelProvider`
 - Latency, jitter, download/upload bandwidth, packet loss, offline
 - Presets: `normal`, `slow2G`, `slow3G`, `fast3G`, `unstable4G`, `offline`
-- Floating debug overlay with live tunnel stats
+- Full-screen debug UI via `NetworkSimulatorLauncherIcon`
 - App-scoped on Android (only your Flutter app is shaped)
 - Zero effect in release builds by default (`kDebugMode`)
 
@@ -31,27 +31,15 @@ flutter pub add network_simulator
 ```dart
 import 'package:network_simulator/network_simulator.dart';
 
-final navigatorKey = GlobalKey<NavigatorState>();
-
 await NetworkSimulator.init(
-  enableOverlay: true,
-  navigatorKey: navigatorKey,
-  // iOS only — Packet Tunnel extension bundle id
-  providerBundleIdentifier: 'com.example.app.NetworkSimulatorTunnel',
+  providerBundleIdentifier: 'com.example.app.NetworkSimulatorTunnel', // iOS
 );
 
-// Explicit opt-in — never auto-starts
-await NetworkSimulator.startTunnel();
+// AppBar: const NetworkSimulatorLauncherIcon()
+await NetworkSimulator.open(context);
 
 NetworkSimulator.setMode(NetworkMode.slow3G);
-NetworkSimulator.custom(
-  latencyMs: 500,
-  downloadMbps: 1,
-  uploadMbps: 0.5,
-  jitterMs: 40,
-  packetLoss: 0.1,
-);
-NetworkSimulator.offline();
+await NetworkSimulator.startTunnel();
 await NetworkSimulator.stopTunnel();
 NetworkSimulator.reset();
 ```
