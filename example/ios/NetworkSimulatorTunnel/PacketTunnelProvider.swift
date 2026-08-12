@@ -4,7 +4,7 @@ import Foundation
 /**
  WIP example Packet Tunnel provider.
  Create an Xcode Network Extension target named NetworkSimulatorTunnel and
- add this file. Configure entitlements per docs/ios-setup.md.
+ add this file. Configure entitlements per doc/ios-setup.md.
 
  This target is NOT wired into the Xcode project automatically — contributors
  must add the extension target on macOS.
@@ -61,7 +61,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         if delay > 0 {
           Thread.sleep(forTimeInterval: max(0, delay) / 1000.0)
         }
-        // WIP: replace with real userspace forwarder (see docs/ios-wip.md).
+        // WIP: replace with real userspace forwarder (see doc/ios-wip.md).
         shaped.append(packet)
         shapedProtocols.append(protocols[i])
       }

@@ -21,7 +21,7 @@ final class TunnelManager {
           code: 1,
           userInfo: [
             NSLocalizedDescriptionKey:
-              "providerBundleIdentifier is required on iOS. See docs/ios-setup.md",
+              "providerBundleIdentifier is required on iOS. See doc/ios-setup.md",
           ]
         )
       )

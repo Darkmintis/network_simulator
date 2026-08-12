@@ -22,7 +22,7 @@ flutter pub add network_simulator
 | Platform | Status |
 |----------|--------|
 | Android | Supported |
-| iOS | Experimental / needs device testing — see [docs/ios-wip.md](docs/ios-wip.md) |
+| iOS | Experimental / needs device testing — see [doc/ios-wip.md](doc/ios-wip.md) |
 
 ## Usage
 
@@ -72,7 +72,7 @@ On Android the system VPN permission dialog appears once. While the tunnel is ru
 - Flutter `3.44.1` (pinned via [FVM](https://fvm.app) — run `fvm use`)
 - Dart `^3.12.0`
 - Android: `compileSdk` / `targetSdk` **36**, `minSdk` 24+, Gradle **8.14**, AGP **8.13.0**
-- iOS 13+ with Network Extension entitlements ([docs/ios-setup.md](docs/ios-setup.md))
+- iOS 13+ with Network Extension entitlements ([doc/ios-setup.md](doc/ios-setup.md))
 
 ```bash
 fvm install 3.44.1
@@ -83,7 +83,7 @@ cd example && fvm flutter run -d android
 
 ## Architecture
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+See [doc/ARCHITECTURE.md](doc/ARCHITECTURE.md).
 
 ## Example
 

@@ -13,7 +13,7 @@ iOS support is experimental and needs device testing.
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'Darkmintis' => 'https://github.com/Darkmintis' }
   s.source           = { :path => '.' }
-  s.source_files = 'Classes/**/*'
+  s.source_files = 'network_simulator/Sources/network_simulator/**/*.swift'
   s.dependency 'Flutter'
   s.platform = :ios, '13.0'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }

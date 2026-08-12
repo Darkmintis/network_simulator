@@ -7,7 +7,7 @@ import NetworkExtension
  STATUS: WIP / UNTESTED ON DEVICE
  Contributors should validate on a real iPhone with proper entitlements.
  Copy this class into the host app's Network Extension target
- (see example/ios/NetworkSimulatorTunnel and docs/ios-setup.md).
+ (see example/ios/NetworkSimulatorTunnel and doc/ios-setup.md).
  */
 open class NetworkSimulatorPacketTunnelProvider: NEPacketTunnelProvider {
   private let shaper = NetworkConditionShaper()

@@ -13,5 +13,5 @@ flutter run -d android
 ## iOS
 
 iOS needs a Packet Tunnel extension target. Sources live in
-`ios/NetworkSimulatorTunnel/` — see `../../docs/ios-setup.md`.
+`ios/NetworkSimulatorTunnel/` — see `../../doc/ios-setup.md`.
 The extension is not fully wired in this example project yet (Mac/Xcode required).

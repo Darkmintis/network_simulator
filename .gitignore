@@ -30,7 +30,8 @@ migrate_working_dir/
 /build/
 /coverage/
 
-# FVM — keep config tracked, ignore local SDK link/cache
+.build/
+.swiftpm/
 .fvm/flutter_sdk
 .fvm/versions
 .fvm/release

@@ -6,7 +6,7 @@ import NetworkExtension
  Flutter plugin entry for iOS tunnel control.
 
  WIP: Packet tunnel provider must live in a host Network Extension target.
- See docs/ios-setup.md and docs/ios-wip.md.
+ See doc/ios-setup.md and doc/ios-wip.md.
  */
 public class NetworkSimulatorPlugin: NSObject, FlutterPlugin {
   private var methodChannel: FlutterMethodChannel?
