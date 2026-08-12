@@ -9,10 +9,13 @@ import 'tunnel_stats.dart';
 import 'tunnel_status.dart';
 
 /// Owns simulation config and tunnel lifecycle state for the Dart layer.
+///
+/// Prefer [NetworkSimulator] for app integration; use this class when you need
+/// direct access to [ChangeNotifier] updates or custom platform injection.
 class NetworkSimulatorController extends ChangeNotifier {
-  NetworkSimulatorController({
-    NetworkSimulatorPlatform? platform,
-  }) : _platformOverride = platform;
+  /// Creates a controller, optionally overriding the platform implementation.
+  NetworkSimulatorController({NetworkSimulatorPlatform? platform})
+    : _platformOverride = platform;
 
   final NetworkSimulatorPlatform? _platformOverride;
 
@@ -29,24 +32,51 @@ class NetworkSimulatorController extends ChangeNotifier {
   StreamSubscription<TunnelStats>? _statsSub;
   StreamSubscription<String>? _errorSub;
 
+  /// Active shaping preset.
   NetworkMode get mode => _config.mode;
+
+  /// Current one-way latency in milliseconds.
   double get latencyMs => _config.latencyMs;
+
+  /// Download bandwidth cap in megabits per second.
   double get downloadMbps => _config.downloadMbps;
+
+  /// Upload bandwidth cap in megabits per second.
   double get uploadMbps => _config.uploadMbps;
+
+  /// Average of [downloadMbps] and [uploadMbps] for display.
   double get bandwidthMbps => _config.bandwidthMbps;
+
+  /// Random latency variation in milliseconds.
   double get jitterMs => _config.jitterMs;
+
+  /// Packet loss fraction (0.0–1.0).
   double get packetLoss => _config.packetLoss;
+
+  /// Whether offline mode is active.
   bool get isOffline => _config.isOffline;
+
+  /// Full config snapshot sent to native code on tunnel updates.
   NetworkSimulatorConfig get config => _config;
+
+  /// Latest tunnel lifecycle state from the platform layer.
   TunnelStatus get status => _status;
+
+  /// Latest throughput counters from the platform layer.
   TunnelStats get stats => _stats;
+
+  /// Last error message, if [status] is [TunnelStatus.error].
   String? get lastError => _lastError;
+
+  /// Whether the tunnel is starting or connected.
   bool get isTunnelActive => _status.isActive;
 
+  /// Stores the iOS Packet Tunnel provider bundle identifier.
   void configure({String? providerBundleIdentifier}) {
     _providerBundleIdentifier = providerBundleIdentifier;
   }
 
+  /// Subscribes to native status, stats, and error event streams.
   Future<void> bindPlatformListeners() async {
     await _statusSub?.cancel();
     await _statsSub?.cancel();
@@ -75,8 +105,10 @@ class NetworkSimulatorController extends ChangeNotifier {
     }
   }
 
+  /// Returns whether the current platform exposes a supported tunnel.
   Future<bool> isSupported() => _platform.isSupported();
 
+  /// Starts the VPN tunnel with the current [config].
   Future<void> startTunnel() async {
     _lastError = null;
     _status = TunnelStatus.preparing;
@@ -100,6 +132,7 @@ class NetworkSimulatorController extends ChangeNotifier {
     }
   }
 
+  /// Stops the VPN tunnel and resets live stats.
   Future<void> stopTunnel() async {
     _status = TunnelStatus.disconnecting;
     notifyListeners();
@@ -116,12 +149,14 @@ class NetworkSimulatorController extends ChangeNotifier {
     }
   }
 
+  /// Applies a built-in [NetworkMode] preset.
   void setMode(NetworkMode mode) {
     _config = NetworkSimulatorConfig.forMode(mode);
     notifyListeners();
     _pushConfigIfActive();
   }
 
+  /// Applies custom shaping values and switches to [NetworkMode.custom].
   void setCustom({
     double? latencyMs,
     double? downloadMbps,
@@ -146,12 +181,14 @@ class NetworkSimulatorController extends ChangeNotifier {
     _pushConfigIfActive();
   }
 
+  /// Blocks all traffic by applying the offline preset.
   void enableOffline() {
     _config = const NetworkSimulatorConfig.offline();
     notifyListeners();
     _pushConfigIfActive();
   }
 
+  /// Restores the normal (unshaped) preset and clears the last error.
   void reset() {
     _config = const NetworkSimulatorConfig.normal();
     _lastError = null;

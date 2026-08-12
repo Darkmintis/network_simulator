@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+/// Draggable floating action button that opens the simulator control panel.
 class NetworkSimulatorFloatingButton extends StatelessWidget {
+  /// Creates the overlay button that invokes [onPressed] when tapped.
   const NetworkSimulatorFloatingButton({super.key, required this.onPressed});
 
+  /// Called when the user taps the floating button.
   final VoidCallback onPressed;
 
   @override
@@ -27,11 +30,7 @@ class NetworkSimulatorFloatingButton extends StatelessWidget {
             ),
           ],
         ),
-        child: const Icon(
-          Icons.wifi_tethering,
-          color: Colors.white,
-          size: 20,
-        ),
+        child: const Icon(Icons.wifi_tethering, color: Colors.white, size: 20),
       ),
     );
   }

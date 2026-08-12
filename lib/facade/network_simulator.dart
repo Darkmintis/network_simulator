@@ -17,6 +17,7 @@ class NetworkSimulator {
   static GlobalKey<NavigatorState>? _navigatorKey;
   static bool _initialized = false;
 
+  /// Shared controller for advanced integrations and overlay binding.
   static NetworkSimulatorController get controller => _controller;
 
   /// Initializes the debug simulator. Does not start the VPN.
@@ -42,6 +43,7 @@ class NetworkSimulator {
     }
   }
 
+  /// Attaches the draggable debug overlay using the [navigatorKey] from [init].
   static void enableOverlay() {
     if (!kDebugMode || _navigatorKey == null) return;
     NetworkSimulatorOverlay.attach(
@@ -50,27 +52,32 @@ class NetworkSimulator {
     );
   }
 
+  /// Returns whether the current platform supports a local VPN tunnel.
   static Future<bool> isSupported() async {
     if (!kDebugMode) return false;
     return _controller.isSupported();
   }
 
+  /// Requests VPN permission and starts shaping app traffic.
   static Future<void> startTunnel() async {
     if (!kDebugMode) return;
     _ensureInitialized();
     await _controller.startTunnel();
   }
 
+  /// Stops the VPN tunnel and restores normal networking.
   static Future<void> stopTunnel() async {
     if (!kDebugMode) return;
     await _controller.stopTunnel();
   }
 
+  /// Applies a built-in [NetworkMode] preset to the active or next tunnel.
   static void setMode(NetworkMode mode) {
     if (!kDebugMode) return;
     _controller.setMode(mode);
   }
 
+  /// Applies custom shaping values and switches to [NetworkMode.custom].
   static void custom({
     double? latencyMs,
     double? downloadMbps,
@@ -90,11 +97,13 @@ class NetworkSimulator {
     );
   }
 
+  /// Blocks all traffic through the tunnel (offline simulation).
   static void offline() {
     if (!kDebugMode) return;
     _controller.enableOffline();
   }
 
+  /// Restores the normal (unshaped) preset.
   static void reset() {
     if (!kDebugMode) return;
     _controller.reset();

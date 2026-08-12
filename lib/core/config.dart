@@ -2,6 +2,7 @@ import 'mode.dart';
 
 /// Immutable simulation parameters shared with native shapers.
 class NetworkSimulatorConfig {
+  /// Creates a config with explicit shaping values.
   const NetworkSimulatorConfig({
     required this.mode,
     required this.latencyMs,
@@ -12,28 +13,31 @@ class NetworkSimulatorConfig {
     required this.isOffline,
   });
 
+  /// Unshaped network with unlimited bandwidth.
   const NetworkSimulatorConfig.normal()
-      : this(
-          mode: NetworkMode.normal,
-          latencyMs: 0,
-          downloadMbps: double.infinity,
-          uploadMbps: double.infinity,
-          jitterMs: 0,
-          packetLoss: 0,
-          isOffline: false,
-        );
+    : this(
+        mode: NetworkMode.normal,
+        latencyMs: 0,
+        downloadMbps: double.infinity,
+        uploadMbps: double.infinity,
+        jitterMs: 0,
+        packetLoss: 0,
+        isOffline: false,
+      );
 
+  /// Drops all traffic (100% packet loss).
   const NetworkSimulatorConfig.offline()
-      : this(
-          mode: NetworkMode.offline,
-          latencyMs: 0,
-          downloadMbps: 0,
-          uploadMbps: 0,
-          jitterMs: 0,
-          packetLoss: 1,
-          isOffline: true,
-        );
+    : this(
+        mode: NetworkMode.offline,
+        latencyMs: 0,
+        downloadMbps: 0,
+        uploadMbps: 0,
+        jitterMs: 0,
+        packetLoss: 1,
+        isOffline: true,
+      );
 
+  /// Returns the default [NetworkSimulatorConfig] for a [NetworkMode] preset.
   factory NetworkSimulatorConfig.forMode(NetworkMode mode) {
     switch (mode) {
       case NetworkMode.normal:
@@ -87,12 +91,25 @@ class NetworkSimulatorConfig {
     }
   }
 
+  /// Active preset or custom profile.
   final NetworkMode mode;
+
+  /// Base one-way latency in milliseconds.
   final double latencyMs;
+
+  /// Download bandwidth cap in megabits per second.
   final double downloadMbps;
+
+  /// Upload bandwidth cap in megabits per second.
   final double uploadMbps;
+
+  /// Random latency variation applied on top of [latencyMs].
   final double jitterMs;
+
+  /// Fraction of packets dropped (0.0–1.0).
   final double packetLoss;
+
+  /// When `true`, all traffic is blocked regardless of other fields.
   final bool isOffline;
 
   /// Backward-compatible average bandwidth helper for UI.
@@ -105,6 +122,7 @@ class NetworkSimulatorConfig {
     return (downloadMbps + uploadMbps) / 2;
   }
 
+  /// Serializes this config for the native MethodChannel bridge.
   Map<String, dynamic> toPlatformMap() {
     return <String, dynamic>{
       'mode': mode.name,
@@ -117,6 +135,7 @@ class NetworkSimulatorConfig {
     };
   }
 
+  /// Returns a copy with the given fields replaced.
   NetworkSimulatorConfig copyWith({
     NetworkMode? mode,
     double? latencyMs,

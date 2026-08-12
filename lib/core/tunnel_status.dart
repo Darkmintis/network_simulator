@@ -1,11 +1,24 @@
 /// Lifecycle state of the local VPN / packet tunnel.
 enum TunnelStatus {
+  /// Tunnel is not running.
   idle,
+
+  /// Native layer is allocating resources before connecting.
   preparing,
+
+  /// VPN permission granted and tunnel is being established.
   connecting,
+
+  /// Traffic is actively shaped through the tunnel.
   connected,
+
+  /// Tunnel is shutting down.
   disconnecting,
+
+  /// Last start/stop operation failed; see [NetworkSimulatorController.lastError].
   error,
+
+  /// Platform does not expose a supported tunnel implementation.
   unsupported;
 
   /// Parses native / MethodChannel status strings.
@@ -32,7 +45,9 @@ enum TunnelStatus {
   String get wireName => name;
 }
 
+/// Convenience helpers for [TunnelStatus].
 extension TunnelStatusX on TunnelStatus {
+  /// Human-readable label for UI display.
   String get label {
     switch (this) {
       case TunnelStatus.idle:
@@ -52,6 +67,7 @@ extension TunnelStatusX on TunnelStatus {
     }
   }
 
+  /// Whether the tunnel is starting or already shaping traffic.
   bool get isActive =>
       this == TunnelStatus.connected ||
       this == TunnelStatus.connecting ||

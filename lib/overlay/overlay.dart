@@ -5,11 +5,13 @@ import '../core/controller.dart';
 import 'control_panel.dart';
 import 'floating_button.dart';
 
+/// Draggable debug overlay entry point for the network simulator UI.
 class NetworkSimulatorOverlay {
   NetworkSimulatorOverlay._();
 
   static OverlayEntry? _entry;
 
+  /// Inserts a floating control button into the app's navigator overlay.
   static void attach({
     required NetworkSimulatorController controller,
     required GlobalKey<NavigatorState> navigatorKey,
@@ -29,6 +31,7 @@ class NetworkSimulatorOverlay {
     });
   }
 
+  /// Removes the overlay entry if it was previously attached.
   static void detach() {
     _entry?.remove();
     _entry = null;
@@ -68,8 +71,14 @@ class _NetworkSimulatorOverlayLayerState
       child: GestureDetector(
         onPanUpdate: (details) {
           setState(() {
-            _top = (_top + details.delta.dy).clamp(0, size.height - _buttonSize);
-            _left = (_left + details.delta.dx).clamp(0, size.width - _buttonSize);
+            _top = (_top + details.delta.dy).clamp(
+              0,
+              size.height - _buttonSize,
+            );
+            _left = (_left + details.delta.dx).clamp(
+              0,
+              size.width - _buttonSize,
+            );
           });
         },
         child: SafeArea(

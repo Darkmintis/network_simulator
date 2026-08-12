@@ -14,14 +14,16 @@ class MethodChannelNetworkSimulator extends NetworkSimulatorPlatform {
     EventChannel? statusChannel,
     EventChannel? statsChannel,
     EventChannel? errorChannel,
-  })  : _methodChannel =
-            methodChannel ?? const MethodChannel('network_simulator/tunnel'),
-        _statusChannel = statusChannel ??
-            const EventChannel('network_simulator/tunnel_status'),
-        _statsChannel =
-            statsChannel ?? const EventChannel('network_simulator/tunnel_stats'),
-        _errorChannel =
-            errorChannel ?? const EventChannel('network_simulator/tunnel_errors');
+  }) : _methodChannel =
+           methodChannel ?? const MethodChannel('network_simulator/tunnel'),
+       _statusChannel =
+           statusChannel ??
+           const EventChannel('network_simulator/tunnel_status'),
+       _statsChannel =
+           statsChannel ?? const EventChannel('network_simulator/tunnel_stats'),
+       _errorChannel =
+           errorChannel ??
+           const EventChannel('network_simulator/tunnel_errors');
 
   final MethodChannel _methodChannel;
   final EventChannel _statusChannel;
@@ -47,8 +49,7 @@ class MethodChannelNetworkSimulator extends NetworkSimulatorPlatform {
   }) {
     return _methodChannel.invokeMethod<void>('startTunnel', <String, dynamic>{
       'config': config.toPlatformMap(),
-      if (providerBundleIdentifier != null)
-        'providerBundleIdentifier': providerBundleIdentifier,
+      'providerBundleIdentifier': ?providerBundleIdentifier,
     });
   }
 
@@ -68,8 +69,8 @@ class MethodChannelNetworkSimulator extends NetworkSimulatorPlatform {
   @override
   Stream<TunnelStatus> get statusStream {
     return _statusChannel.receiveBroadcastStream().map(
-          (event) => TunnelStatus.parse(event?.toString()),
-        );
+      (event) => TunnelStatus.parse(event?.toString()),
+    );
   }
 
   @override
@@ -85,7 +86,7 @@ class MethodChannelNetworkSimulator extends NetworkSimulatorPlatform {
   @override
   Stream<String> get errorStream {
     return _errorChannel.receiveBroadcastStream().map(
-          (event) => event?.toString() ?? 'Unknown tunnel error',
-        );
+      (event) => event?.toString() ?? 'Unknown tunnel error',
+    );
   }
 }

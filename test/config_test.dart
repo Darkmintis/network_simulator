@@ -39,7 +39,10 @@ void main() {
     test('forMode covers all presets', () {
       for (final mode in NetworkMode.values) {
         final config = NetworkSimulatorConfig.forMode(mode);
-        expect(config.mode, mode == NetworkMode.custom ? NetworkMode.custom : mode);
+        expect(
+          config.mode,
+          mode == NetworkMode.custom ? NetworkMode.custom : mode,
+        );
       }
 
       final slow2g = NetworkSimulatorConfig.forMode(NetworkMode.slow2G);
@@ -72,7 +75,9 @@ void main() {
     });
 
     test('toPlatformMap encodes finite bandwidth', () {
-      final map = NetworkSimulatorConfig.forMode(NetworkMode.fast3G).toPlatformMap();
+      final map = NetworkSimulatorConfig.forMode(
+        NetworkMode.fast3G,
+      ).toPlatformMap();
       expect(map['downloadMbps'], 1.5);
       expect(map['uploadMbps'], 0.75);
       expect(map['latencyMs'], 300);
