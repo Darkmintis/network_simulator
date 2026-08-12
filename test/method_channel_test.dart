@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:network_simulator/network_simulator.dart';
+import 'package:network_simulator/platform/method_channel_network_simulator.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -14,20 +15,20 @@ void main() {
     log.clear();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(methodChannel, (call) async {
-      log.add(call);
-      switch (call.method) {
-        case 'isSupported':
-          return true;
-        case 'getStatus':
-          return 'connected';
-        case 'startTunnel':
-        case 'stopTunnel':
-        case 'updateConfig':
-          return null;
-        default:
-          return null;
-      }
-    });
+          log.add(call);
+          switch (call.method) {
+            case 'isSupported':
+              return true;
+            case 'getStatus':
+              return 'connected';
+            case 'startTunnel':
+            case 'stopTunnel':
+            case 'updateConfig':
+              return null;
+            default:
+              return null;
+          }
+        });
     platform = MethodChannelNetworkSimulator(methodChannel: methodChannel);
   });
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:network_simulator/network_simulator.dart';
+import 'package:network_simulator/platform/network_simulator_platform.dart';
 
 import 'support/fake_platform.dart';
 
@@ -26,9 +27,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: NetworkSimulatorFloatingButton(
-            onPressed: () => pressed = true,
-          ),
+          body: NetworkSimulatorFloatingButton(onPressed: () => pressed = true),
         ),
       ),
     );
@@ -44,10 +43,8 @@ void main() {
           body: Builder(
             builder: (context) {
               return ElevatedButton(
-                onPressed: () => NetworkSimulatorControlPanel.show(
-                  context,
-                  controller,
-                ),
+                onPressed: () =>
+                    NetworkSimulatorControlPanel.show(context, controller),
                 child: const Text('open'),
               );
             },

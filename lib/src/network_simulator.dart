@@ -7,5 +7,3 @@ export '../facade/network_simulator.dart';
 export '../overlay/control_panel.dart';
 export '../overlay/floating_button.dart';
 export '../overlay/overlay.dart';
-export '../platform/method_channel_network_simulator.dart';
-export '../platform/network_simulator_platform.dart';

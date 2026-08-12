@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:network_simulator/network_simulator.dart';
+import 'package:network_simulator/platform/network_simulator_platform.dart';
 
 import 'support/fake_platform.dart';
 
@@ -48,11 +49,7 @@ void main() {
     });
 
     test('setCustom prefers explicit download/upload over bandwidthMbps', () {
-      controller.setCustom(
-        bandwidthMbps: 9,
-        downloadMbps: 3,
-        uploadMbps: 1,
-      );
+      controller.setCustom(bandwidthMbps: 9, downloadMbps: 3, uploadMbps: 1);
       expect(controller.downloadMbps, 3);
       expect(controller.uploadMbps, 1);
     });

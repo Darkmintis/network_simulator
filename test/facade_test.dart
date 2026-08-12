@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:network_simulator/network_simulator.dart';
+import 'package:network_simulator/platform/network_simulator_platform.dart';
 
 import 'support/fake_platform.dart';
 

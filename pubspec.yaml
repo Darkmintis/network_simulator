@@ -18,12 +18,16 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
   plugin_platform_interface: ^2.1.8
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+
+example: example
 
 flutter:
   plugin:
@@ -33,3 +37,12 @@ flutter:
         pluginClass: NetworkSimulatorPlugin
       ios:
         pluginClass: NetworkSimulatorPlugin
+      linux:
+        dartPluginClass: NetworkSimulatorPluginLinux
+      macos:
+        dartPluginClass: NetworkSimulatorPluginMacOS
+      windows:
+        dartPluginClass: NetworkSimulatorPluginWindows
+      web:
+        pluginClass: NetworkSimulatorPluginWeb
+        fileName: network_simulator_web.dart

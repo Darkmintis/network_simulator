@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:network_simulator/network_simulator.dart';
+import 'package:network_simulator/platform/network_simulator_platform.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 /// Shared fake platform for unit tests.
