@@ -3,7 +3,7 @@ import 'package:flutter/widgets.dart';
 
 import '../core/controller.dart';
 import '../core/mode.dart';
-import '../overlay/overlay.dart';
+import '../ui/network_simulator_screen.dart';
 
 /// Static facade for the local VPN network condition simulator.
 ///
@@ -14,42 +14,27 @@ class NetworkSimulator {
   static final NetworkSimulatorController _controller =
       NetworkSimulatorController();
 
-  static GlobalKey<NavigatorState>? _navigatorKey;
   static bool _initialized = false;
 
-  /// Shared controller for advanced integrations and overlay binding.
+  /// Shared controller for advanced integrations.
   static NetworkSimulatorController get controller => _controller;
 
   /// Initializes the debug simulator. Does not start the VPN.
   ///
   /// [providerBundleIdentifier] is required on iOS (Packet Tunnel extension id).
-  static Future<void> init({
-    bool enableOverlay = false,
-    GlobalKey<NavigatorState>? navigatorKey,
-    String? providerBundleIdentifier,
-  }) async {
+  static Future<void> init({String? providerBundleIdentifier}) async {
     if (!kDebugMode) return;
 
-    _navigatorKey = navigatorKey;
     _controller.configure(providerBundleIdentifier: providerBundleIdentifier);
     await _controller.bindPlatformListeners();
     _initialized = true;
-
-    if (enableOverlay && navigatorKey != null) {
-      NetworkSimulatorOverlay.attach(
-        controller: _controller,
-        navigatorKey: navigatorKey,
-      );
-    }
   }
 
-  /// Attaches the draggable debug overlay using the [navigatorKey] from [init].
-  static void enableOverlay() {
-    if (!kDebugMode || _navigatorKey == null) return;
-    NetworkSimulatorOverlay.attach(
-      controller: _controller,
-      navigatorKey: _navigatorKey!,
-    );
+  /// Opens the full-screen network simulator UI. Back button or pop to close.
+  static Future<void> open(BuildContext context) {
+    if (!kDebugMode) return Future.value();
+    _ensureInitialized();
+    return NetworkSimulatorScreen.open(context, controller: _controller);
   }
 
   /// Returns whether the current platform supports a local VPN tunnel.
@@ -112,7 +97,7 @@ class NetworkSimulator {
   static void _ensureInitialized() {
     if (!_initialized) {
       throw StateError(
-        'NetworkSimulator.init() must be called before startTunnel().',
+        'NetworkSimulator.init() must be called before using the simulator.',
       );
     }
   }

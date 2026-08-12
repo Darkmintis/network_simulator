@@ -22,29 +22,52 @@ void main() {
     await platform.dispose();
   });
 
-  testWidgets('floating button invokes callback', (tester) async {
-    var pressed = false;
+  testWidgets('launcher icon pushes simulator screen', (tester) async {
+    await NetworkSimulator.init();
+
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: NetworkSimulatorFloatingButton(onPressed: () => pressed = true),
+          appBar: AppBar(actions: const [NetworkSimulatorLauncherIcon()]),
         ),
       ),
     );
 
-    await tester.tap(find.byType(NetworkSimulatorFloatingButton));
-    expect(pressed, isTrue);
+    await tester.tap(find.byIcon(Icons.wifi_tethering_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Network Simulator'), findsOneWidget);
+    expect(find.text('Start tunnel'), findsOneWidget);
+    expect(find.text('Slow 3G'), findsOneWidget);
+    expect(find.text('Real network speed — no artificial limits'), findsOneWidget);
   });
 
-  testWidgets('control panel shows tunnel controls and stats', (tester) async {
+  testWidgets('simulator screen start tunnel triggers platform', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkSimulatorScreen(controller: controller),
+      ),
+    );
+
+    await tester.tap(find.text('Start tunnel'));
+    await tester.pumpAndSettle();
+
+    expect(platform.startCount, 1);
+    expect(controller.status, TunnelStatus.connected);
+    expect(find.text('Stop tunnel'), findsOneWidget);
+  });
+
+  testWidgets('simulator screen closes with back', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: Builder(
             builder: (context) {
               return ElevatedButton(
-                onPressed: () =>
-                    NetworkSimulatorControlPanel.show(context, controller),
+                onPressed: () => NetworkSimulatorScreen.open(
+                  context,
+                  controller: controller,
+                ),
                 child: const Text('open'),
               );
             },
@@ -55,28 +78,10 @@ void main() {
 
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
-
-    expect(find.text('Network Simulator'), findsOneWidget);
     expect(find.text('Start tunnel'), findsOneWidget);
-    expect(find.text('Apply'), findsOneWidget);
-    expect(find.text('Offline'), findsOneWidget);
-    expect(find.text('Reset'), findsOneWidget);
-  });
 
-  testWidgets('control panel start tunnel triggers platform', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: NetworkSimulatorControlPanel(controller: controller),
-        ),
-      ),
-    );
-
-    await tester.tap(find.text('Start tunnel'));
+    await tester.pageBack();
     await tester.pumpAndSettle();
-
-    expect(platform.startCount, 1);
-    expect(controller.status, TunnelStatus.connected);
-    expect(find.text('Stop tunnel'), findsOneWidget);
+    expect(find.text('open'), findsOneWidget);
   });
 }

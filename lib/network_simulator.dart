@@ -4,10 +4,9 @@
 /// using latency, jitter, bandwidth caps, packet loss, and offline presets.
 ///
 /// ```dart
-/// await NetworkSimulator.init(
-///   enableOverlay: true,
-///   navigatorKey: navigatorKey,
-/// );
+/// await NetworkSimulator.init();
+/// // Add NetworkSimulatorLauncherIcon() to your debug AppBar, then:
+/// await NetworkSimulator.open(context);
 /// await NetworkSimulator.startTunnel();
 /// NetworkSimulator.setMode(NetworkMode.slow3G);
 /// ```
