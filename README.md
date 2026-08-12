@@ -4,6 +4,8 @@
 
 A Flutter **debug** plugin that simulates real-world network conditions through a **local VPN tunnel** — not fake HTTP delays.
 
+**Supported platforms: Android and iOS only.** Web, Windows, macOS, and Linux are not supported.
+
 **Repository:** [github.com/Darkmintis/network_simulator](https://github.com/Darkmintis/network_simulator)
 
 ```bash

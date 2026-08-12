@@ -5,6 +5,7 @@ Thanks for helping with **network_simulator**.
 ## Project direction
 
 - Real local VPN traffic shaping only (no fake Dio delays)
+- **Android and iOS only** — no web/desktop support
 - Android is the supported reference implementation
 - iOS is experimental — see [doc/ios-wip.md](doc/ios-wip.md)
 
