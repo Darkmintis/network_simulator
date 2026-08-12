@@ -3,6 +3,8 @@ package com.darkmintis.network_simulator.channel
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import com.darkmintis.network_simulator.config.TunnelConfig
 import com.darkmintis.network_simulator.tunnel.NetworkSimulatorVpnService
 import io.flutter.plugin.common.EventChannel
@@ -29,6 +31,8 @@ class TunnelMethodHandler(
 
     @Volatile
     private var currentStatus: String = "idle"
+
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
@@ -93,16 +97,16 @@ class TunnelMethodHandler(
     }
 
     override fun onStats(stats: Map<String, Any>) {
-        statsSink?.success(stats)
+        mainHandler.post { statsSink?.success(stats) }
     }
 
     override fun onError(message: String) {
-        errorSink?.success(message)
+        mainHandler.post { errorSink?.success(message) }
     }
 
     private fun emitStatus(status: String) {
         currentStatus = status
-        statusSink?.success(status)
+        mainHandler.post { statusSink?.success(status) }
     }
 
     companion object {

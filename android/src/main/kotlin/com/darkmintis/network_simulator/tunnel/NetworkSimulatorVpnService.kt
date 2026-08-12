@@ -68,7 +68,13 @@ class NetworkSimulatorVpnService : VpnService() {
                 .addDnsServer("8.8.8.8")
                 .addDnsServer("1.1.1.1")
 
-            runCatching { builder.addAllowedApplication(packageName) }
+            runCatching {
+                builder.addAllowedApplication(applicationContext.packageName)
+            }.onFailure {
+                listener?.onError(
+                    "Could not scope VPN to ${applicationContext.packageName}: ${it.message}",
+                )
+            }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 builder.setMetered(false)

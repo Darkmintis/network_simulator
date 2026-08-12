@@ -119,7 +119,13 @@ class NetworkSimulatorController extends ChangeNotifier {
         config: _config,
         providerBundleIdentifier: _providerBundleIdentifier,
       );
-      _status = await _platform.getStatus();
+      for (var attempt = 0; attempt < 15; attempt++) {
+        _status = await _platform.getStatus();
+        if (_status == TunnelStatus.connected || _status == TunnelStatus.error) {
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
       if (_status == TunnelStatus.idle || _status == TunnelStatus.preparing) {
         _status = TunnelStatus.connected;
       }

@@ -80,7 +80,6 @@ class LocalForwardingPipeline(
         tcpSessions = null
         executor?.shutdownNow()
         executor = null
-        runCatching { tunInterface?.close() }
         tunInterface = null
     }
 
