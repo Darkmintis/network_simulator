@@ -42,11 +42,19 @@ class NetworkConditionShaper : TrafficShaper {
         val bucket = if (direction == TrafficDirection.UPLOAD) uploadBucket else downloadBucket
         while (!bucket.tryConsume(sizeBytes)) {
             val wait = bucket.waitTimeMillis(sizeBytes)
-            Thread.sleep(wait.coerceAtMost(50))
+            interruptibleSleep(wait.coerceAtMost(50))
         }
         val delay = delayLoss.nextDelayMillis()
         if (delay > 0) {
-            Thread.sleep(delay)
+            interruptibleSleep(delay)
+        }
+    }
+
+    private fun interruptibleSleep(millis: Long) {
+        try {
+            Thread.sleep(millis)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
         }
     }
 

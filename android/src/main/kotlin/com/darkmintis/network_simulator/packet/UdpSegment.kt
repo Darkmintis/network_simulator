@@ -14,7 +14,9 @@ data class UdpSegment(
             val sourcePort = ((data[offset].toInt() and 0xFF) shl 8) or (data[offset + 1].toInt() and 0xFF)
             val destPort = ((data[offset + 2].toInt() and 0xFF) shl 8) or (data[offset + 3].toInt() and 0xFF)
             val length = ((data[offset + 4].toInt() and 0xFF) shl 8) or (data[offset + 5].toInt() and 0xFF)
-            val payloadLength = (length - 8).coerceAtLeast(0)
+            if (length < 8) return null
+            val maxPayload = packet.payloadLength - 8
+            val payloadLength = (length - 8).coerceIn(0, maxPayload)
             val payload = data.copyOfRange(offset + 8, offset + 8 + payloadLength)
             return UdpSegment(sourcePort, destPort, payload)
         }

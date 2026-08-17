@@ -9,10 +9,15 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Local VPN packet pipeline: TUN → parse → TCP/UDP NAT → shaped upstream.
+ * Local VPN packet pipeline: TUN → queue → TCP/UDP NAT → shaped upstream.
+ *
+ * The TUN reader stays non-blocking; shaping and socket IO run on workers.
  */
 class LocalForwardingPipeline(
     private val protector: SocketProtector,
@@ -23,6 +28,7 @@ class LocalForwardingPipeline(
     private var tunInterface: ParcelFileDescriptor? = null
     private var readerThread: Thread? = null
     private var executor: ExecutorService? = null
+    private var packetExecutor: ExecutorService? = null
     private var udpSessions: UdpSessionManager? = null
     private var tcpSessions: TcpSessionManager? = null
     private val writeLock = Any()
@@ -31,8 +37,22 @@ class LocalForwardingPipeline(
         stop()
         this.tunInterface = tunInterface
         stats.reset()
-        val executor = Executors.newFixedThreadPool(8)
+
+        // Session pumps (connect + remote→TUN) share a bounded pool.
+        val executor = ThreadPoolExecutor(
+            4,
+            32,
+            60L,
+            TimeUnit.SECONDS,
+            LinkedBlockingQueue(256),
+            Executors.defaultThreadFactory(),
+            ThreadPoolExecutor.CallerRunsPolicy(),
+        )
         this.executor = executor
+
+        // Packet handling / shaping runs off the TUN reader.
+        val packetExecutor = Executors.newFixedThreadPool(4)
+        this.packetExecutor = packetExecutor
 
         val output = FileOutputStream(tunInterface.fileDescriptor)
         val writer: (ByteArray) -> Unit = { packet ->
@@ -54,17 +74,26 @@ class LocalForwardingPipeline(
                 } catch (_: Exception) {
                     break
                 }
-                if (length <= 0) {
-                    Thread.sleep(1)
+                if (length < 0) break
+                if (length == 0) {
+                    try {
+                        Thread.sleep(1)
+                    } catch (_: InterruptedException) {
+                        break
+                    }
                     continue
                 }
                 val raw = buffer.copyOf(length)
-                val packet = Ipv4Packet.parse(raw) ?: continue
-                when (packet.protocol) {
-                    Ipv4Packet.PROTOCOL_UDP -> udpSessions?.handlePacket(packet)
-                    Ipv4Packet.PROTOCOL_TCP -> tcpSessions?.handlePacket(packet)
-                    else -> {
-                        // ICMP and others are dropped in MVP.
+                packetExecutor.execute {
+                    if (!running.get()) return@execute
+                    try {
+                        val packet = Ipv4Packet.parse(raw) ?: return@execute
+                        when (packet.protocol) {
+                            Ipv4Packet.PROTOCOL_UDP -> udpSessions?.handlePacket(packet)
+                            Ipv4Packet.PROTOCOL_TCP -> tcpSessions?.handlePacket(packet)
+                            else -> stats.onDrop()
+                        }
+                    } catch (_: Exception) {
                         stats.onDrop()
                     }
                 }
@@ -81,6 +110,8 @@ class LocalForwardingPipeline(
         tcpSessions?.closeAll()
         udpSessions = null
         tcpSessions = null
+        packetExecutor?.shutdownNow()
+        packetExecutor = null
         executor?.shutdownNow()
         executor = null
         tunInterface = null

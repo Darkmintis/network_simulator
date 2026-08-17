@@ -18,6 +18,9 @@ import kotlin.random.Random
 /**
  * Userspace TCP proxy sessions. Terminates TCP on the TUN side and relays
  * through protected sockets to the real network.
+ *
+ * Packet loss is not applied to TCP download bytes (opaque drops would create
+ * unrecoverable sequence holes). Latency and bandwidth still apply.
  */
 class TcpSessionManager(
     private val protector: SocketProtector,
@@ -45,6 +48,7 @@ class TcpSessionManager(
         var clientNextSeq: Long,
         var serverSeq: Long,
         val closed: AtomicBoolean = AtomicBoolean(false),
+        val lock: Any = Any(),
     )
 
     private val sessions = ConcurrentHashMap<Key, Session>()
@@ -74,9 +78,10 @@ class TcpSessionManager(
         if (session == null) {
             handshakes[key]?.let { state ->
                 if (segment.isAck && !segment.isSyn) {
+                    val advance = segment.payload.size + if (segment.isFin) 1 else 0
                     state.clientNextSeq = maxSeq(
                         state.clientNextSeq,
-                        (segment.sequenceNumber + segment.payload.size) and 0xFFFFFFFFL,
+                        (segment.sequenceNumber + advance) and 0xFFFFFFFFL,
                     )
                 }
                 if (segment.payload.isNotEmpty() || segment.isFin) {
@@ -91,6 +96,7 @@ class TcpSessionManager(
 
     private fun handleSessionPacket(session: Session, segment: TcpSegment, packetSize: Int) {
         val key = session.key
+
         if (!shaper.admit(TrafficDirection.UPLOAD, packetSize)) {
             stats.onDrop()
             return
@@ -98,29 +104,56 @@ class TcpSessionManager(
         shaper.shape(TrafficDirection.UPLOAD, packetSize)
         stats.onUpload(packetSize)
 
-        if (segment.payload.isNotEmpty()) {
-            try {
-                val out: OutputStream = session.socket.getOutputStream()
-                out.write(segment.payload)
-                out.flush()
-                session.clientNextSeq =
-                    (segment.sequenceNumber + segment.payload.size) and 0xFFFFFFFFL
-                ackClient(session)
-            } catch (_: Exception) {
-                closeSession(session)
-                sessions.remove(key)
-            }
-        }
+        synchronized(session.lock) {
+            if (session.closed.get()) return
 
-        if (segment.isFin) {
-            session.clientNextSeq = (segment.sequenceNumber + 1) and 0xFFFFFFFFL
-            ackClient(session)
-            runCatching { session.socket.shutdownOutput() }
+            if (segment.payload.isNotEmpty()) {
+                val expected = session.clientNextSeq
+                val seq = segment.sequenceNumber and 0xFFFFFFFFL
+                val delta = (seq - expected) and 0xFFFFFFFFL
+                when {
+                    delta == 0L -> {
+                        try {
+                            val out: OutputStream = session.socket.getOutputStream()
+                            out.write(segment.payload)
+                            out.flush()
+                            session.clientNextSeq =
+                                (seq + segment.payload.size) and 0xFFFFFFFFL
+                            ackClientLocked(session)
+                        } catch (_: Exception) {
+                            closeSession(session)
+                            sessions.remove(key)
+                            return
+                        }
+                    }
+                    delta > 0x80000000L -> {
+                        ackClientLocked(session)
+                    }
+                    else -> {
+                        ackClientLocked(session)
+                    }
+                }
+            }
+
+            if (segment.isFin) {
+                val finSeq = if (segment.payload.isNotEmpty()) {
+                    (segment.sequenceNumber + segment.payload.size) and 0xFFFFFFFFL
+                } else {
+                    segment.sequenceNumber and 0xFFFFFFFFL
+                }
+                if (finSeq == session.clientNextSeq) {
+                    session.clientNextSeq = (finSeq + 1) and 0xFFFFFFFFL
+                    ackClientLocked(session)
+                    runCatching { session.socket.shutdownOutput() }
+                }
+            }
         }
     }
 
     private fun flushPending(session: Session, state: HandshakeState) {
-        session.clientNextSeq = state.clientNextSeq
+        synchronized(session.lock) {
+            session.clientNextSeq = state.clientNextSeq
+        }
         while (true) {
             val segment = state.pendingSegments.poll() ?: break
             handleSessionPacket(session, segment, segment.payload.size + 40)
@@ -134,7 +167,6 @@ class TcpSessionManager(
 
     private fun handleSyn(key: Key, segment: TcpSegment, packetSize: Int) {
         handshakes[key]?.let { state ->
-            // SYN retransmit — reply with the same SYN-ACK.
             shapeUpload(packetSize)
             writeSynAck(key, state)
             return
@@ -151,8 +183,6 @@ class TcpSessionManager(
         val clientNextSeq = (segment.sequenceNumber + 1) and 0xFFFFFFFFL
         val state = HandshakeState(serverSeq = serverSeq, clientNextSeq = clientNextSeq)
         handshakes[key] = state
-
-        // Reply immediately so the client does not flood SYN retransmits.
         writeSynAck(key, state)
 
         executor.execute {
@@ -162,6 +192,7 @@ class TcpSessionManager(
                     throw IllegalStateException("Failed to protect TCP socket from VPN loop")
                 }
                 socket.tcpNoDelay = true
+                socket.soTimeout = 0
                 socket.connect(
                     InetSocketAddress(
                         Ipv4Packet.addressToString(key.remoteIp),
@@ -203,7 +234,7 @@ class TcpSessionManager(
             payload = ByteArray(0),
             mss = DEFAULT_MSS,
         )
-        shapeAndWriteDownload(packet)
+        shapeTcpDownload(packet)
     }
 
     private fun writeRst(key: Key, state: HandshakeState) {
@@ -218,7 +249,7 @@ class TcpSessionManager(
             window = 0,
             payload = ByteArray(0),
         )
-        shapeAndWriteDownload(packet)
+        shapeTcpDownload(packet)
     }
 
     private fun shapeUpload(packetSize: Int) {
@@ -228,41 +259,63 @@ class TcpSessionManager(
 
     private fun pumpRemoteToTun(session: Session) {
         executor.execute {
-            val buffer = ByteArray(16 * 1024)
+            val buffer = ByteArray(DEFAULT_MSS)
             try {
                 val input: InputStream = session.socket.getInputStream()
                 while (!session.closed.get()) {
                     val read = input.read(buffer)
                     if (read < 0) break
                     if (read == 0) continue
-                    val payload = buffer.copyOf(read)
-                    val packet = PacketBuilder.buildTcp(
-                        sourceIp = session.key.remoteIp,
-                        destIp = session.key.clientIp,
-                        sourcePort = session.key.remotePort,
-                        destPort = session.key.clientPort,
-                        seq = session.serverSeq,
-                        ack = session.clientNextSeq,
-                        flags = TcpSegment.FLAG_ACK or TcpSegment.FLAG_PSH,
-                        window = 65535,
-                        payload = payload,
-                    )
-                    shapeAndWriteDownload(packet)
-                    session.serverSeq = (session.serverSeq + read) and 0xFFFFFFFFL
+                    var offset = 0
+                    while (offset < read && !session.closed.get()) {
+                        val chunkLen = minOf(DEFAULT_MSS, read - offset)
+                        val payload = buffer.copyOfRange(offset, offset + chunkLen)
+                        val seq: Long
+                        val ack: Long
+                        synchronized(session.lock) {
+                            seq = session.serverSeq
+                            ack = session.clientNextSeq
+                        }
+                        val packet = PacketBuilder.buildTcp(
+                            sourceIp = session.key.remoteIp,
+                            destIp = session.key.clientIp,
+                            sourcePort = session.key.remotePort,
+                            destPort = session.key.clientPort,
+                            seq = seq,
+                            ack = ack,
+                            flags = TcpSegment.FLAG_ACK or TcpSegment.FLAG_PSH,
+                            window = 65535,
+                            payload = payload,
+                        )
+                        shapeTcpDownload(packet)
+                        synchronized(session.lock) {
+                            session.serverSeq = (session.serverSeq + chunkLen) and 0xFFFFFFFFL
+                        }
+                        offset += chunkLen
+                    }
                 }
 
+                val seq: Long
+                val ack: Long
+                synchronized(session.lock) {
+                    seq = session.serverSeq
+                    ack = session.clientNextSeq
+                }
                 val fin = PacketBuilder.buildTcp(
                     sourceIp = session.key.remoteIp,
                     destIp = session.key.clientIp,
                     sourcePort = session.key.remotePort,
                     destPort = session.key.clientPort,
-                    seq = session.serverSeq,
-                    ack = session.clientNextSeq,
+                    seq = seq,
+                    ack = ack,
                     flags = TcpSegment.FLAG_FIN or TcpSegment.FLAG_ACK,
                     window = 65535,
                     payload = ByteArray(0),
                 )
-                shapeAndWriteDownload(fin)
+                shapeTcpDownload(fin)
+                synchronized(session.lock) {
+                    session.serverSeq = (session.serverSeq + 1) and 0xFFFFFFFFL
+                }
             } catch (_: Exception) {
                 // Remote closed.
             } finally {
@@ -272,7 +325,7 @@ class TcpSessionManager(
         }
     }
 
-    private fun ackClient(session: Session) {
+    private fun ackClientLocked(session: Session) {
         val ack = PacketBuilder.buildTcp(
             sourceIp = session.key.remoteIp,
             destIp = session.key.clientIp,
@@ -284,14 +337,11 @@ class TcpSessionManager(
             window = 65535,
             payload = ByteArray(0),
         )
-        shapeAndWriteDownload(ack)
+        shapeTcpDownload(ack)
     }
 
-    private fun shapeAndWriteDownload(packet: ByteArray) {
-        if (!shaper.admit(TrafficDirection.DOWNLOAD, packet.size)) {
-            stats.onDrop()
-            return
-        }
+    private fun shapeTcpDownload(packet: ByteArray) {
+        // Delay + bandwidth only; loss would create unrecoverable holes.
         shaper.shape(TrafficDirection.DOWNLOAD, packet.size)
         stats.onDownload(packet.size)
         writer(packet)
