@@ -2,9 +2,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A Flutter **debug** plugin that simulates real-world network conditions through a **local VPN tunnel** — not fake HTTP delays.
+A Flutter **debug** plugin that simulates real-world network conditions through a **local Android VPN tunnel** - not fake HTTP delays.
 
-**Supported platforms: Android and iOS only.** Web, Windows, macOS, and Linux are not supported.
+**Supported platform: Android only.** iOS, web, Windows, macOS, and Linux are not supported.
 
 **Repository:** [github.com/Darkmintis/network_simulator](https://github.com/Darkmintis/network_simulator)
 
@@ -14,26 +14,19 @@ flutter pub add network_simulator
 
 ## Features
 
-- **Real traffic shaping** via Android `VpnService` / iOS `NEPacketTunnelProvider`
+- **Real traffic shaping** via Android `VpnService` + userspace TCP/UDP NAT
 - Latency, jitter, download/upload bandwidth, packet loss, offline
 - Presets: `normal`, `slow2G`, `slow3G`, `fast3G`, `unstable4G`, `offline`
 - Full-screen debug UI via `NetworkSimulatorLauncherIcon`
-- App-scoped on Android (only your Flutter app is shaped)
+- App-scoped VPN (only your Flutter app is shaped)
 - Zero effect in release builds by default (`kDebugMode`)
-
-| Platform | Status |
-|----------|--------|
-| Android | Supported |
-| iOS | Experimental / needs device testing — see [doc/ios-wip.md](doc/ios-wip.md) |
 
 ## Usage
 
 ```dart
 import 'package:network_simulator/network_simulator.dart';
 
-await NetworkSimulator.init(
-  providerBundleIdentifier: 'com.example.app.NetworkSimulatorTunnel', // iOS
-);
+await NetworkSimulator.init();
 
 // AppBar: const NetworkSimulatorLauncherIcon()
 await NetworkSimulator.open(context);
@@ -44,7 +37,7 @@ await NetworkSimulator.stopTunnel();
 NetworkSimulator.reset();
 ```
 
-On Android the system VPN permission dialog appears once. While the tunnel is running you will see a foreground notification and a VPN indicator.
+The system VPN permission dialog appears once. While the tunnel is running you will see a foreground notification and a VPN indicator.
 
 ## Profiles
 
@@ -55,14 +48,13 @@ On Android the system VPN permission dialog appears once. While the tunnel is ru
 | slow3G | 800 ms | 0.5 Mbps | 0.25 Mbps | 10% | 150 ms |
 | fast3G | 300 ms | 1.5 Mbps | 0.75 Mbps | 3% | 50 ms |
 | unstable4G | 120 ms | 4 Mbps | 2 Mbps | 15% | 80 ms |
-| offline | — | 0 | 0 | 100% | — |
+| offline | - | 0 | 0 | 100% | - |
 
 ## Requirements
 
-- Flutter `3.44.1` (pinned via [FVM](https://fvm.app) — run `fvm use`)
+- Flutter `3.44.1` (pinned via [FVM](https://fvm.app) - run `fvm use`)
 - Dart `^3.12.0`
 - Android: `compileSdk` / `targetSdk` **36**, `minSdk` 24+, Gradle **8.14**, AGP **8.13.0**
-- iOS 13+ with Network Extension entitlements ([doc/ios-setup.md](doc/ios-setup.md))
 
 ```bash
 fvm install 3.44.1
@@ -82,11 +74,17 @@ cd example
 flutter run -d android
 ```
 
-Use the overlay to start the tunnel, pick Slow 3G, then hit any HTTP endpoint in the demo.
+Open the simulator from the app-bar wifi icon, start the tunnel (Normal), then hit any HTTP endpoint in the demo. Switch to Slow 3G / Offline to verify shaping.
+
+## Known limitations
+
+- Android only (IPv4 TCP/UDP; ICMP dropped in the MVP stack)
+- IPv6 traffic is not shaped (VPN is IPv4)
+- Debug builds only by default
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). iOS forwarder help is especially welcome.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

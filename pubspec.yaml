@@ -1,5 +1,5 @@
 name: network_simulator
-description: A Flutter debug tool that simulates real-world network conditions via a local VPN tunnel on Android and iOS (latency, jitter, bandwidth, packet loss, offline).
+description: A Flutter debug tool that simulates real-world network conditions via a local Android VPN tunnel (latency, jitter, bandwidth, packet loss, offline).
 version: 0.1.0
 homepage: https://github.com/Darkmintis/network_simulator
 repository: https://github.com/Darkmintis/network_simulator
@@ -32,6 +32,4 @@ flutter:
     platforms:
       android:
         package: com.darkmintis.network_simulator
-        pluginClass: NetworkSimulatorPlugin
-      ios:
         pluginClass: NetworkSimulatorPlugin
