@@ -7,7 +7,7 @@ import '../core/tunnel_stats.dart';
 import '../core/tunnel_status.dart';
 import 'network_simulator_platform.dart';
 
-/// MethodChannel + EventChannel bridge to Android / iOS tunnels.
+/// MethodChannel + EventChannel bridge to the Android VPN tunnel.
 class MethodChannelNetworkSimulator extends NetworkSimulatorPlatform {
   MethodChannelNetworkSimulator({
     MethodChannel? methodChannel,
@@ -32,24 +32,30 @@ class MethodChannelNetworkSimulator extends NetworkSimulatorPlatform {
 
   @override
   Future<bool> isSupported() async {
-    final result = await _methodChannel.invokeMethod<bool>('isSupported');
-    return result ?? false;
+    try {
+      final result = await _methodChannel.invokeMethod<bool>('isSupported');
+      return result ?? false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
   }
 
   @override
   Future<TunnelStatus> getStatus() async {
-    final raw = await _methodChannel.invokeMethod<String>('getStatus');
-    return TunnelStatus.parse(raw);
+    try {
+      final raw = await _methodChannel.invokeMethod<String>('getStatus');
+      return TunnelStatus.parse(raw);
+    } on MissingPluginException {
+      return TunnelStatus.unsupported;
+    }
   }
 
   @override
-  Future<void> startTunnel({
-    required NetworkSimulatorConfig config,
-    String? providerBundleIdentifier,
-  }) {
+  Future<void> startTunnel({required NetworkSimulatorConfig config}) {
     return _methodChannel.invokeMethod<void>('startTunnel', <String, dynamic>{
       'config': config.toPlatformMap(),
-      'providerBundleIdentifier': ?providerBundleIdentifier,
     });
   }
 

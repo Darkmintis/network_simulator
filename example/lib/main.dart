@@ -4,10 +4,7 @@ import 'package:network_simulator/network_simulator.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await NetworkSimulator.init(
-    providerBundleIdentifier:
-        'com.example.networkSimulator.NetworkSimulatorTunnel',
-  );
+  await NetworkSimulator.init();
   runApp(const ExampleApp());
 }
 

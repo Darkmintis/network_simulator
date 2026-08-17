@@ -5,7 +5,7 @@ import '../core/tunnel_stats.dart';
 import '../core/tunnel_status.dart';
 import 'method_channel_network_simulator.dart';
 
-/// Contract between Dart and native VPN / packet-tunnel implementations.
+/// Contract between Dart and the native Android VPN implementation.
 abstract class NetworkSimulatorPlatform extends PlatformInterface {
   NetworkSimulatorPlatform() : super(token: _token);
 
@@ -24,10 +24,7 @@ abstract class NetworkSimulatorPlatform extends PlatformInterface {
 
   Future<TunnelStatus> getStatus();
 
-  Future<void> startTunnel({
-    required NetworkSimulatorConfig config,
-    String? providerBundleIdentifier,
-  });
+  Future<void> startTunnel({required NetworkSimulatorConfig config});
 
   Future<void> stopTunnel();
 

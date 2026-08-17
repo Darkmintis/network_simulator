@@ -156,10 +156,31 @@ void main() {
       expect(await controller.isSupported(), isTrue);
     });
 
-    test('configure stores provider bundle id for startTunnel', () async {
-      controller.configure(providerBundleIdentifier: 'com.example.tunnel');
-      await controller.startTunnel();
-      expect(platform.lastProviderBundleId, 'com.example.tunnel');
+    test('startTunnel fails when status stays connecting', () async {
+      final neverConnected = _NeverConnectedPlatform();
+      final stuckController = NetworkSimulatorController(platform: neverConnected);
+      await expectLater(
+        stuckController.startTunnel(),
+        throwsA(isA<StateError>()),
+      );
+      expect(stuckController.status, TunnelStatus.error);
+      expect(stuckController.lastError, contains('connected'));
+      stuckController.dispose();
+      await neverConnected.dispose();
     });
   });
 }
+
+class _NeverConnectedPlatform extends FakeNetworkSimulatorPlatform {
+  @override
+  Future<void> startTunnel({required NetworkSimulatorConfig config}) async {
+    startCount++;
+    lastConfig = config;
+    status = TunnelStatus.connecting;
+    statusController.add(status);
+  }
+
+  @override
+  Future<TunnelStatus> getStatus() async => TunnelStatus.connecting;
+}
+

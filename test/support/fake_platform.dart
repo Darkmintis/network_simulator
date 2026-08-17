@@ -11,7 +11,6 @@ class FakeNetworkSimulatorPlatform extends NetworkSimulatorPlatform
 
   TunnelStatus status = TunnelStatus.idle;
   NetworkSimulatorConfig? lastConfig;
-  String? lastProviderBundleId;
   int startCount = 0;
   int stopCount = 0;
   int updateCount = 0;
@@ -33,13 +32,9 @@ class FakeNetworkSimulatorPlatform extends NetworkSimulatorPlatform
   Future<TunnelStatus> getStatus() async => status;
 
   @override
-  Future<void> startTunnel({
-    required NetworkSimulatorConfig config,
-    String? providerBundleIdentifier,
-  }) async {
+  Future<void> startTunnel({required NetworkSimulatorConfig config}) async {
     startCount++;
     lastConfig = config;
-    lastProviderBundleId = providerBundleIdentifier;
     if (startError != null) {
       throw startError!;
     }

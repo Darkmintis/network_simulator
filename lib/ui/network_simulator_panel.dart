@@ -47,6 +47,8 @@ class _NetworkSimulatorPanelState extends State<NetworkSimulatorPanel> {
       } else {
         await controller.startTunnel();
       }
+    } catch (_) {
+      // Errors are surfaced via controller.lastError / status.
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -144,8 +146,7 @@ class _NetworkSimulatorPanelState extends State<NetworkSimulatorPanel> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Shapes all app traffic while the tunnel is running. '
-              'Android supported · iOS experimental.',
+              'Shapes all app traffic while the tunnel is running. Android only.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],

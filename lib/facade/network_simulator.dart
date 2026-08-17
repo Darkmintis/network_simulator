@@ -5,7 +5,7 @@ import '../core/controller.dart';
 import '../core/mode.dart';
 import '../ui/network_simulator_screen.dart';
 
-/// Static facade for the local VPN network condition simulator.
+/// Static facade for the local Android VPN network condition simulator.
 ///
 /// All public APIs are no-ops outside [kDebugMode].
 class NetworkSimulator {
@@ -20,12 +20,9 @@ class NetworkSimulator {
   static NetworkSimulatorController get controller => _controller;
 
   /// Initializes the debug simulator. Does not start the VPN.
-  ///
-  /// [providerBundleIdentifier] is required on iOS (Packet Tunnel extension id).
-  static Future<void> init({String? providerBundleIdentifier}) async {
+  static Future<void> init() async {
     if (!kDebugMode) return;
 
-    _controller.configure(providerBundleIdentifier: providerBundleIdentifier);
     await _controller.bindPlatformListeners();
     _initialized = true;
   }
@@ -38,6 +35,8 @@ class NetworkSimulator {
   }
 
   /// Returns whether the current platform supports a local VPN tunnel.
+  ///
+  /// Only Android is supported.
   static Future<bool> isSupported() async {
     if (!kDebugMode) return false;
     return _controller.isSupported();

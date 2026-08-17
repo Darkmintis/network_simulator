@@ -47,19 +47,13 @@ void main() {
       expect(await platform.getStatus(), TunnelStatus.connected);
     });
 
-    test('startTunnel sends config and provider id', () async {
+    test('startTunnel sends config map', () async {
       final config = NetworkSimulatorConfig.forMode(NetworkMode.slow3G);
-      await platform.startTunnel(
-        config: config,
-        providerBundleIdentifier: 'com.example.NetworkSimulatorTunnel',
-      );
+      await platform.startTunnel(config: config);
 
       expect(log.single.method, 'startTunnel');
       final args = log.single.arguments as Map;
-      expect(
-        args['providerBundleIdentifier'],
-        'com.example.NetworkSimulatorTunnel',
-      );
+      expect(args.containsKey('providerBundleIdentifier'), isFalse);
       final sent = args['config'] as Map;
       expect(sent['mode'], 'slow3G');
       expect(sent['latencyMs'], 800);

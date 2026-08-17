@@ -26,7 +26,6 @@ class NetworkSimulatorController extends ChangeNotifier {
   TunnelStatus _status = TunnelStatus.idle;
   TunnelStats _stats = const TunnelStats.zero();
   String? _lastError;
-  String? _providerBundleIdentifier;
 
   StreamSubscription<TunnelStatus>? _statusSub;
   StreamSubscription<TunnelStats>? _statsSub;
@@ -71,11 +70,6 @@ class NetworkSimulatorController extends ChangeNotifier {
   /// Whether the tunnel is starting or connected.
   bool get isTunnelActive => _status.isActive;
 
-  /// Stores the iOS Packet Tunnel provider bundle identifier.
-  void configure({String? providerBundleIdentifier}) {
-    _providerBundleIdentifier = providerBundleIdentifier;
-  }
-
   /// Subscribes to native status, stats, and error event streams.
   Future<void> bindPlatformListeners() async {
     await _statusSub?.cancel();
@@ -106,6 +100,8 @@ class NetworkSimulatorController extends ChangeNotifier {
   }
 
   /// Returns whether the current platform exposes a supported tunnel.
+  ///
+  /// Only Android registers the plugin; other platforms return false.
   Future<bool> isSupported() => _platform.isSupported();
 
   /// Starts the VPN tunnel with the current [config].
@@ -115,21 +111,27 @@ class NetworkSimulatorController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _platform.startTunnel(
-        config: _config,
-        providerBundleIdentifier: _providerBundleIdentifier,
-      );
-      for (var attempt = 0; attempt < 15; attempt++) {
+      await _platform.startTunnel(config: _config);
+      for (var attempt = 0; attempt < 20; attempt++) {
         _status = await _platform.getStatus();
-        if (_status == TunnelStatus.connected || _status == TunnelStatus.error) {
+        if (_status == TunnelStatus.connected ||
+            _status == TunnelStatus.error ||
+            _status == TunnelStatus.idle) {
           break;
         }
-        await Future<void>.delayed(const Duration(milliseconds: 100));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
       }
-      if (_status == TunnelStatus.idle || _status == TunnelStatus.preparing) {
-        _status = TunnelStatus.connected;
+      if (_status != TunnelStatus.connected) {
+        _lastError ??=
+            'Tunnel did not reach connected state (status: ${_status.name}).';
+        if (_status != TunnelStatus.error) {
+          _status = TunnelStatus.error;
+        }
       }
       notifyListeners();
+      if (_status == TunnelStatus.error) {
+        throw StateError(_lastError ?? 'Failed to start tunnel');
+      }
     } catch (error) {
       _lastError = error.toString();
       _status = TunnelStatus.error;
@@ -205,7 +207,12 @@ class NetworkSimulatorController extends ChangeNotifier {
   void _pushConfigIfActive() {
     if (_status == TunnelStatus.connected ||
         _status == TunnelStatus.connecting) {
-      unawaited(_platform.updateConfig(_config));
+      unawaited(
+        _platform.updateConfig(_config).catchError((Object error) {
+          _lastError = error.toString();
+          notifyListeners();
+        }),
+      );
     }
   }
 

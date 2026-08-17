@@ -55,7 +55,7 @@ class TunnelStats {
   /// Measured download throughput in megabits per second.
   final double downloadMbps;
 
-  /// Compact one-line summary for the debug overlay.
+  /// Compact one-line summary for the debug UI.
   String get summary {
     return '↓ ${downloadMbps.toStringAsFixed(2)} Mbps · '
         '↑ ${uploadMbps.toStringAsFixed(2)} Mbps · '

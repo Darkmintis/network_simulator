@@ -24,7 +24,7 @@ enum NetworkMode {
 
 /// UI labels for [NetworkMode] presets.
 extension NetworkModeProfile on NetworkMode {
-  /// Human-readable label shown in the debug overlay.
+  /// Human-readable label shown in the debug UI.
   String get label {
     switch (this) {
       case NetworkMode.normal:

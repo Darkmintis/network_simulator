@@ -1,7 +1,7 @@
 /// Real network condition simulation for Flutter debug builds.
 ///
-/// Shapes app traffic through a local VPN tunnel on **Android and iOS only**
-/// using latency, jitter, bandwidth caps, packet loss, and offline presets.
+/// Shapes app traffic through a local **Android** VPN tunnel using latency,
+/// jitter, bandwidth caps, packet loss, and offline presets.
 ///
 /// ```dart
 /// await NetworkSimulator.init();
