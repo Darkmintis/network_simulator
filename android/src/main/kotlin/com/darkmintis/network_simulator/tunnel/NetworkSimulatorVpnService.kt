@@ -60,31 +60,40 @@ class NetworkSimulatorVpnService : VpnService() {
             listener?.onStatus("connecting")
             startForeground(NOTIFICATION_ID, buildNotification())
 
+            // Always tear down any previous pipeline before establishing a new TUN.
+            pipelineRef.getAndSet(null)?.stop()
+            runCatching { tunInterface?.close() }
+            tunInterface = null
+
             val builder = Builder()
                 .setSession("Network Simulator")
-                .setMtu(1500)
+                .setMtu(MTU)
                 .addAddress(VPN_ADDRESS, 24)
                 .addRoute("0.0.0.0", 0)
                 .addDnsServer("8.8.8.8")
                 .addDnsServer("1.1.1.1")
 
-            runCatching {
+            try {
                 builder.addAllowedApplication(applicationContext.packageName)
-            }.onFailure {
+            } catch (error: Exception) {
                 listener?.onError(
-                    "Could not scope VPN to ${applicationContext.packageName}: ${it.message}",
+                    "Could not scope VPN to ${applicationContext.packageName}: ${error.message}",
                 )
+                listener?.onStatus("error")
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 builder.setMetered(false)
             }
 
-            runCatching { tunInterface?.close() }
             val established = builder.establish()
             if (established == null) {
                 listener?.onError("Unable to establish VPN interface")
                 listener?.onStatus("error")
+                stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return
             }
@@ -129,6 +138,11 @@ class NetworkSimulatorVpnService : VpnService() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
         listener?.onStatus("idle")
+    }
+
+    override fun onRevoke() {
+        stopTunnel()
+        super.onRevoke()
     }
 
     override fun onDestroy() {
@@ -177,6 +191,7 @@ class NetworkSimulatorVpnService : VpnService() {
         const val ACTION_STOP = "com.darkmintis.network_simulator.STOP"
         const val ACTION_UPDATE_CONFIG = "com.darkmintis.network_simulator.UPDATE_CONFIG"
         private const val VPN_ADDRESS = "10.0.0.2"
+        private const val MTU = 1500
         private const val NOTIFICATION_ID = 7201
 
         @Volatile

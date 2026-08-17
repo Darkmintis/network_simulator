@@ -2,6 +2,7 @@ package com.darkmintis.network_simulator
 
 import android.app.Activity
 import com.darkmintis.network_simulator.channel.TunnelMethodHandler
+import com.darkmintis.network_simulator.tunnel.NetworkSimulatorVpnService
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -62,6 +63,9 @@ class NetworkSimulatorPlugin : FlutterPlugin, ActivityAware {
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        if (NetworkSimulatorVpnService.listener === handler) {
+            NetworkSimulatorVpnService.listener = null
+        }
         methodChannel?.setMethodCallHandler(null)
         statusChannel?.setStreamHandler(null)
         statsChannel?.setStreamHandler(null)
